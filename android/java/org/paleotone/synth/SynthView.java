@@ -61,7 +61,7 @@ final class SynthView extends View {
         super.onDraw(c);c.drawColor(BG);
         scale=Math.min(getWidth()/1280f,getHeight()/800f);dx=(getWidth()-1280*scale)/2;dy=(getHeight()-800*scale)/2;
         c.save();c.translate(dx,dy);c.scale(scale,scale);
-        text(c,"PALEOTONE",24,43,32,AMBER);text(c,"ANDROID / NATIVE ALPHA 0.3.1",252,40,12,MUTED);
+        text(c,"PALEOTONE",24,43,32,AMBER);text(c,"ANDROID / NATIVE ALPHA 0.4.0",252,40,12,MUTED);
         for(int i=0;i<6;++i){rect(c,actions[i],i==4?0xff573d32:PANEL);label(c,actions[i],i==1?(running?"STOP":"START"):actionNames[i],TEXT);}
         text(c,stats,24,74,13,MUTED);
         rect(c,new RectF(16,88,440,512),EDGE);

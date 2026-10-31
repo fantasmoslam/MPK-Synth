@@ -45,3 +45,5 @@ python3 -c 'from android.build import starter_samples; from pathlib import Path;
 java -ea -cp build/android-tests org.paleotone.synth.WavSampleTest "build/android-tests/starter/Flute C4.wav" "build/android-tests/starter/Jungle C3.wav"
 cc $FIRMWARE android/tests/scape_test.c -lm -o build/android-tests/scape_test
 build/android-tests/scape_test
+javac -encoding UTF-8 -d build/android-tests android/java/org/paleotone/synth/ui/*.java android/tests/UiTest.java
+java -ea -cp build/android-tests org.paleotone.synth.ui.UiTest

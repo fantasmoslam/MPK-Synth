@@ -16,6 +16,11 @@ import java.io.*;
 public final class MainActivity extends Activity {
     private SynthView panel;
     private Workspace workspace;
+    private Shell shell;
+    private NativeEngine engine;
+    private final org.paleotone.synth.ui.UiState uiState=new org.paleotone.synth.ui.UiState();
+    private long lastTick;
+    private int tick;
     private MidiInput midi;
     private boolean running, resumed, focusHeld, wantAudio;
     private Boolean pickerAudio;
@@ -70,6 +75,10 @@ public final class MainActivity extends Activity {
         }
         panel.update(Native.stats(),Native.peak(),running||recovery.pending());
         workspace.update(running||recovery.pending());
+        if(lastTick!=0&&running)uiState.runElapsed+=now-lastTick;
+        lastTick=now;
+        if(++tick%3==0)engine.refresh();
+        shell.view.tick();
         handler.postDelayed(this,33);
     }};
     @Override public void onCreate(Bundle state) {
@@ -88,7 +97,10 @@ public final class MainActivity extends Activity {
         byte[] saved=null;
         try { saved=session.readFully(); } catch(IOException ignored) {}
         Native.init(saved);
-        panel=new SynthView(this);workspace=new Workspace(this,panel);setContentView(workspace);
+        panel=new SynthView(this);workspace=new Workspace(this,panel);
+        engine=new NativeEngine(this);
+        uiState.load(getPreferences(MODE_PRIVATE).getString("ui",null));
+        shell=new Shell(this,workspace,new PhosphorView(this,uiState,engine));setContentView(shell);
         midi=new MidiInput(this);
         audio.registerAudioDeviceCallback(devices,handler);
     }
@@ -97,12 +109,17 @@ public final class MainActivity extends Activity {
         super.onWindowFocusChanged(focused);
         if(focused&&resumed)KioskController.restore(this);
     }
-    void notice(String message){panel.notice=message;panel.invalidate();}
+    void notice(String message){
+        panel.notice=message;panel.invalidate();
+        uiState.notice=message;uiState.noticeUntil=SystemClock.uptimeMillis()+3500;if(shell!=null)shell.view.ui.invalidate();
+    }
+    boolean audioRunning(){return running;}
     void maintenance(){panel.release();KioskController.menu(this);}
     @Override protected void onPause(){
         resumed=false;wantAudio=false;recovery.cancel();handler.removeCallbacks(refresh);
         panel.release();midi.close();Native.stop();running=false;
         writeSession();
+        getPreferences(MODE_PRIVATE).edit().putString("ui",uiState.save()).apply();lastTick=0;
         if(focusHeld)audio.abandonAudioFocus(focus);focusHeld=false;
         super.onPause();
     }

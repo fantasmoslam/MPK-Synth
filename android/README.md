@@ -1,4 +1,4 @@
-# Paleotone Android — native alpha 0.3.0
+# Paleotone Android — native alpha 0.4.0
 
 Standalone synthesis for Dylan's Samsung SM-T510. Initial measured device configuration:
 Android 15 / unofficial LineageOS 22.2-20260910, `armeabi-v7a,armeabi`, 48 kHz
@@ -9,6 +9,34 @@ this is **not** a physical latency measurement or an accepted synth performance 
 The APK carries native libraries for both `armeabi-v7a` (the SM-T510's 32-bit userspace) and
 `arm64-v8a` (64-bit tablets such as the Galaxy Tab S6 Lite SM-P610 on official LineageOS 23.2).
 The 64-bit build has not yet been accepted on a device.
+
+## Round-three interface (0.4.0, phase 1)
+
+The signed-off round-three design (Focus by default, Performance switchable) replaces
+the four-tab workspace. `java/org/paleotone/synth/ui/` holds the screens and controls as
+plain Java drawing through `Gfx`, so the same code runs on the tablet (`PhosphorView`,
+Android Canvas) and on a desktop JDK for review screenshots:
+
+```sh
+sh android/preview/render.sh build/preview
+```
+
+Phase 1 delivers the header, navigation rail and Performance dock, the fixed bottom bar
+(environment, music, Stop All, save), INSTRUMENT in both layouts with the eight notes to
+the conductor, Hold/Next, Biome, Music mood and Live balance, and Settings. Knobs follow the
+review's zero rule: unipolar knobs sweep from 7 o'clock to 5 o'clock; only engine-marked
+bipolar parameters point to 12 at zero, with a centre tick. Until later phases:
+
+- The notes are saved with the interface state but not yet connected; their gauges show a dash.
+- Mixer and Library show the existing pages inside the new frame; Sound design opens the
+  firmware panel, which is also under Settings → Legacy panel.
+- Recording, run length, the expedition screens, map, journal, bestiary and Start are not built yet.
+- The run clock counts time with audio running; it is not yet the run timer.
+
+Fonts (SIL OFL 1.1, licences in the APK's `assets/licenses`): Michroma, IBM Plex Mono,
+Caveat and IM FELL English. `android/tests/UiTest.java` checks the knob zero rule, both
+layouts on every screen at 1280 and 1333 units wide, dragging, layout switching, Stop All
+over sheets and the dock.
 
 ## Source baseline and scope
 

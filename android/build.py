@@ -52,6 +52,8 @@ def starter_samples(destination):
                 output.setparams(original.getparams())
                 output.writeframes(frames[:len(frames)//align*align])
 
+INTERFACE_FONTS=["IBMPlexMono-Regular.ttf","IBMPlexMono-Medium.ttf","Michroma-Regular.ttf","Caveat[wght].ttf","IMFeENrm28P.ttf"]
+
 def main():
     if not PLATFORM.is_file() or not all((NDK/compiler).is_file() for _,compiler in ABIS):
         raise SystemExit("Install the documented Android SDK/NDK packages and set ANDROID_HOME.")
@@ -86,8 +88,11 @@ def main():
     shutil.copy(ROOT/"LICENSING.md",OUT/"assets/licenses/LICENSING.md")
     shutil.copy(ROOT/"assets/samples-cc0/ATTRIBUTION.txt",OUT/"assets/licenses/SAMPLES.txt")
     starter_samples(OUT/"assets/starter")
+    # The round-three interface fonts (SIL OFL 1.1; licences are in assets/licenses).
+    (OUT/"assets/fonts").mkdir(parents=True,exist_ok=True)
+    for name in INTERFACE_FONTS:shutil.copy(ROOT/"assets/fonts"/name,OUT/"assets/fonts"/name)
     (OUT/"assets/BUILD.txt").write_text(
-        "Paleotone Android 0.3.1-alpha\nGPL-3.0-only\n"+
+        "Paleotone Android 0.4.0-alpha\nGPL-3.0-only\n"+
         subprocess.check_output(["git","rev-parse","HEAD"],cwd=ROOT,text=True).strip()+
         "\nBase: 0390a03f732c5eeec9f62cb2b139df8738396766\n"+
         "Local modifications are included in the corresponding source archive.\n")
@@ -105,7 +110,7 @@ def main():
         run("keytool","-genkeypair","-keystore",key,"-storepass","android","-keypass","android",
             "-alias","androiddebugkey","-keyalg","RSA","-keysize","2048","-validity","10000",
             "-dname","CN=Paleotone Development,O=Paleotone,C=US")
-    apk=OUT/"Paleotone-Android-0.3.1-alpha.apk"
+    apk=OUT/"Paleotone-Android-0.4.0-alpha.apk"
     run(TOOLS/"apksigner","sign","--ks",key,"--ks-pass","pass:android","--key-pass","pass:android",
         "--out",apk,OUT/"aligned.apk")
     run(TOOLS/"apksigner","verify","--verbose",apk)

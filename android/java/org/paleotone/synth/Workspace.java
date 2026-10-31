@@ -20,7 +20,7 @@ final class Workspace extends LinearLayout {
     final int[] pending;
     final long[] pendingSince;
     final ExecutorService worker=Executors.newSingleThreadExecutor();
-    final FrameLayout pages;final TextView status;final Button[] tabs=new Button[4];
+    final FrameLayout pages;final TextView status;final LinearLayout tabBar;final Button[] tabs=new Button[4];
     final SeekBar[] sliders;final TextView[] values;final String[] labels;
     final ArrayList<View> pageViews=new ArrayList<>();
     final LinearLayout libraryRows;final TextView sampleInfo,rootText;
@@ -33,7 +33,7 @@ final class Workspace extends LinearLayout {
         labels=Native.controlLabels();state=Native.controls();texts=Native.controlTexts();
         sliders=new SeekBar[labels.length];values=new TextView[labels.length];
         dragging=new boolean[labels.length];pending=new int[labels.length];Arrays.fill(pending,Integer.MIN_VALUE);pendingSince=new long[labels.length];
-        LinearLayout bar=row();addView(bar,new LayoutParams(-1,dp(50)));
+        LinearLayout bar=row();tabBar=bar;addView(bar,new LayoutParams(-1,dp(50)));
         String[] names={"INSTRUMENT","MIXER","SCAPE","LIBRARY"};
         for(int i=0;i<4;i++){final int n=i;tabs[i]=button(names[i],()->show(n));bar.addView(tabs[i],new LayoutParams(0,-1,1));}
         bar.addView(button("SAVE",()->activity.action(0)));bar.addView(button("⋮",()->activity.maintenance()));
@@ -67,6 +67,8 @@ final class Workspace extends LinearLayout {
             }catch(Exception e){report(e);}
         });
     }
+    /** Inside the round-three shell: its navigation replaces this tab bar. */
+    void embedded(){tabBar.setVisibility(GONE);status.setVisibility(GONE);setBackgroundColor(0xff111811);}
     int dp(int n){return (int)(n*getResources().getDisplayMetrics().density+.5f);}
     private LinearLayout row(){LinearLayout l=new LinearLayout(activity);l.setOrientation(HORIZONTAL);return l;}
     private LinearLayout column(){LinearLayout l=new LinearLayout(activity);l.setOrientation(VERTICAL);l.setPadding(dp(12),dp(6),dp(12),dp(12));return l;}
