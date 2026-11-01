@@ -290,6 +290,68 @@ struct Conductor::Impl {
       tr("D " + std::string(scene_name(cur.type)) + " " + pat); }
   }
 
+  /* ---- the steady drummer (the approved design, Ape Out style): plays from energy and threat */
+  enum Steady { kNoDrums, kWalk, kHeartbeat, kStalkDrums, kGallop, kTribeDrums };
+  static Steady steady_style(int type) {
+    switch (type) {
+      case kMajesty: case kAftermath: case kRest: case kObserveScene: return kHeartbeat;
+      case kStalk: return kStalkDrums;
+      case kStampede: case kFight: return kGallop;
+      case kTribe: return kTribeDrums;
+      case kShelterScene: return kNoDrums;
+      default: return kWalk;
+    }
+  }
+  struct Player { const char* part; int midi; std::vector<int> cyc; int enter, rot, step; };
+  std::vector<Player> tribe;
+  void steady_bar(int b, Steady st, float e, float th, float scale = 1, double from = -1) {
+    double t0 = T(b), Bt = B(b);
+    float dens = .6f + .8f * N(kNDensity);
+    auto D = [&](double t, double d, const char* p, int m, float v) { if (t >= from) n(t, d, p, m, v * scale); }   /* n() already silences drums after hush_from */;
+    switch (st) {
+      case kWalk:
+        for (int beat = 0; beat < 4; beat++) {
+          if (beat == 0 || beat == 2 || U() < e * .5 * dens) D(t0 + beat * Bt, .5, "taiko", beat % 2 == 0 ? LO : MI, (.55f + .4f * e) * (beat == 0 ? 1 : .8f));
+          if (U() < e * .6 * dens) { static const int o[3] = {0, 7, 12}; D(t0 + (beat + .5) * Bt, .3, "logdrum", root(b, 1) + o[I(3)], .3f + .3f * e); }
+        }
+        if (e > .4f && dens > .7f) for (int k = 0; k < 8; k++) D(t0 + k * Bt / 2, .08, "rattle", 0, (.2f + .3f * e) * (k % 2 == 0 ? 1 : .6f));
+        break;
+      case kHeartbeat:
+        D(t0, .5, "taiko", LO, .35f + .5f * e); D(t0 + .75 * Bt, .5, "taiko", LO, (.35f + .5f * e) * .7f);
+        if (e > .5f) D(t0 + 2 * Bt, .5, "bigdrum", 36, .3f + .5f * e);
+        break;
+      case kStalkDrums:
+        for (int k = 0; k < 16; k++) if (U() < (.05 + .35 * th) * dens) { static const int o[3] = {0, 1, 7}; D(t0 + k * Bt / 4, .2, "logdrum", root(b, 1) + o[I(3)], .25f + .4f * th); }
+        if (U() < .3 + .5 * th) D(t0 + (U() < .5 ? 0 : 2) * Bt, .6, "taiko", LO, .3f + .5f * th);
+        break;
+      case kGallop:
+        for (int beat = 0; beat < 4; beat++) {
+          D(t0 + beat * Bt, .5, "taiko", LO, beat % 2 == 0 ? 1 : .85f);
+          D(t0 + (beat + .5) * Bt, .4, "taiko", HI, .55f + .2f * e);
+          D(t0 + (beat + .75) * Bt, .4, "taiko", MI, .6f + .2f * e);
+          if (e > .9f && U() < .6) D(t0 + (beat + .25) * Bt, .3, "taiko", MI, .45f);
+        }
+        D(t0, .8, "bigdrum", 33, .7f + .3f * e);
+        for (int k = 0; k < 16; k++) D(t0 + k * Bt / 4, .08, "rattle", 0, (.4f + .2f * e) * (k % 2 == 0 ? 1 : .6f));
+        for (int k = 0; k < 16; k++) { static const int o[4] = {0, 7, 12, 7}; D(t0 + k * Bt / 4, .1, "logdrum", root(b, 1) + o[k % 4], .4f * (k % 4 == 0 ? 1 : .55f)); }
+        break;
+      case kTribeDrums:
+        for (auto& P : tribe) {
+          if (b - cur.b0 < P.enter) continue;
+          if ((b - cur.b0) % 4 == 0 && U() < .5) P.rot = (P.rot + 1) % int(P.cyc.size());
+          for (int k = 0; k < 16; k++) {
+            if (P.cyc[size_t((P.step + P.rot) % int(P.cyc.size()))] && U() < (.55 + .45 * e) * std::min(1.f, dens)) {
+              static const int o[3] = {0, 7, 12}; int mm = P.midi >= 0 ? P.midi : root(b, 1) + o[I(3)];
+              D(t0 + k * Bt / 4, .2, P.part, mm, (.45f + .45f * e) * (k % 4 == 0 ? 1 : .75f));
+            }
+            P.step++;
+          }
+        }
+        break;
+      case kNoDrums: break;
+    }
+  }
+
   void pipe_to(int midi, float v, double t) {        /* the drone: the conductor moves it between scenes */
     if (midi == drone_midi) return;
     if (drone_h) eng.release(drone_h, std::max(t + .5, now + .5));      /* the old drone fades as the new one comes in */
@@ -420,6 +482,9 @@ struct Conductor::Impl {
     if (nxt.type == kObserveScene || nxt.type == kRest || nxt.type == kShelterScene) nxt.animal = have_cur ? cur.animal : nxt.animal;
     drum_prev = drum;
     cur = nxt; have_cur = true; chords.clear(); walk = 0; hush_from = 1e30;
+    if (cur.type == kTribe)                          /* the tribe's players come in one by one, each with its own cycle */
+      tribe = {{"taiko", LO, {1, 0, 0, 1, 0, 0, 1, 0}, 0, 0, 0}, {"logdrum", -1, {1, 0, 1, 1, 0}, 2, 0, 0}, {"taiko", HI, {0, 0, 1, 0, 1, 0, 1}, 4, 0, 0},
+               {"bigdrum", 36, {1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0}, 6, 0, 0}, {"rattle", 0, {1, 1, 0, 1, 1, 0}, 1, 0, 0}, {"taiko", MI, {0, 1, 0, 0, 1, 1, 0, 1, 0}, 8, 0, 0}};
     if (cur.type == kTravel || cur.type == kHerd || cur.type == kRest || cur.type == kObserveScene) quiet++; else quiet = 0;
     if (cur.type == kTravel || cur.type == kHerd) travels++;
     drum.scene(kDefs[cur.type].drums, cur.e0, cur.th0);
@@ -456,16 +521,9 @@ struct Conductor::Impl {
     /* the bar's drums */
     if (left <= 2 && !build_next && L >= 2 && settle_kind == kThin) { ramp_t0 = T(cur.b1 - 2); ramp_t1 = T(cur.b1 - 2) + 2 * BR; ramp_v0 = 1; ramp_v1 = .4f; }
     else { ramp_t0 = 1e30; ramp_t1 = 0; }
-    groove::Bar hits = drum.bar(cur.type == kRest || cur.type == kObserveScene ? e * .6f : e, th, .6f + .8f * dens);
-    if (k < cur.drums_from) hits.clear();
-    if (cur.type == kAftermath && k >= 4 + I(3)) hits.clear();
-    if (cur.type == kCoda && k >= L - 6) hits.clear();
-    if (left == 1 && !hits.empty() && !breathe) {   /* the fill into what comes next */
-      groove::Bar f = drum.fill(groove::kNumFills, build_next ? 2 + I(3) : 1 + I(2), build_next);
-      float from = 16 - 4.f * (build_next ? 2 : 1); hits.erase(std::remove_if(hits.begin(), hits.end(), [&](const groove::Hit& h) { return h.step >= from; }), hits.end());
-      for (auto& h : f) hits.push_back(h);
-    }
-    if (!breathe) play_hits(b, hits, 1);
+    /* the steady drummer; a fill only before a big moment (the lead-ins below), never at every scene change */
+    bool drums_on = !(k < cur.drums_from) && !(cur.type == kAftermath && k >= 4 + I(3)) && !(cur.type == kCoda && k >= L - 6);
+    if (drums_on && !breathe) steady_bar(b, steady_style(cur.type), cur.type == kRest || cur.type == kObserveScene ? e * .6f : e, th, 1);
     if (cur.type == kShelterScene && U() < .5) n(t0 + I(2) * 2 * Bt, .5, "taiko", LO, .22f);
 
     switch (cur.type) {
@@ -535,7 +593,7 @@ struct Conductor::Impl {
         if (U() < .4) call(animal_call(cur.animal), t0 + I(4) * Bt, .7f, float(U(-.8, .8)), .95f, b);
         break;
       case kCoda:
-        if (k == L - 3) { double dd = 3 * BR + 4; int r = key_at(b); for (int iv : cur.voicing) n(t0, dd, "horn", r - 12 + iv, .6f); n(t0, dd, "fiddle", r + 7 * (U() < .5), .65f); }
+        if (k == L - 3) { double dd = 3 * BR + 4; int r = key_at(b); for (int iv : cur.voicing) { int m = chord_note(b, iv, -1); if (m > -999) n(t0, dd, "horn", m, .6f); } (void)r; n(t0, dd, "fiddle", r + 7 * (U() < .5), .65f); }
         if (k == L - 6 && U() < .7) call(U() < .5 ? "rex" : "sauropod", t0, 1.0f, float(U(-.6, .6)), .85f, b);
         if (k == L - 2) call("ptero", t0 + I(4) * Bt, .4f, float(U(-.6, .6)), .3f, b);
         break;
@@ -566,8 +624,7 @@ struct Conductor::Impl {
     }
     if (build) {
       if (left == 2) {
-        if (build_kind == kSwell) { groove::Drummer pre = drum; pre.scene(kDefs[nxt.type].drums, kDefs[nxt.type].e0, kDefs[nxt.type].th0);
-          play_hits(b, pre.bar(kDefs[nxt.type].e0, kDefs[nxt.type].th0, .8f), .3f); }
+        if (build_kind == kSwell) steady_bar(b, steady_style(nxt.type), kDefs[nxt.type].e0, kDefs[nxt.type].th0, .3f);
         int style = I(3);
         if (style == 0) { for (size_t j = 0; j < cur.voicing.size(); j++) { int m = chord_note(X - 1, cur.voicing[j], -1); if (m > -999) n(T(b) + j * Bt, 2 * BR - j * Bt, "horn", m, .18f + .07f * j); } }
         else if (style == 1) { static const int arp[4] = {12, 15, 19, 24}; for (int j = 0; j < 4; j++) { int m = chord_note(X - 1, arp[j], -1); if (m > -999) n(T(b) + j * 2 * Bt, 2 * Bt * .95, "horn", m, .2f + .06f * j); } }
@@ -576,8 +633,7 @@ struct Conductor::Impl {
       if (left == 1) {
         groove::Bar f;
         switch (build_kind) {
-          case kSwell: { groove::Drummer pre = drum; pre.scene(kDefs[nxt.type].drums, kDefs[nxt.type].e0, kDefs[nxt.type].th0);
-            play_hits(b, pre.bar(kDefs[nxt.type].e0, kDefs[nxt.type].th0, .9f), .6f); f = drum.fill(groove::kRoll, 2, true); break; }
+          case kSwell: steady_bar(b, steady_style(nxt.type), kDefs[nxt.type].e0, kDefs[nxt.type].th0, .6f); f = drum.fill(groove::kRoll, 2, true); break;
           case kStopHit: f = drum.fill(groove::kStopTime, 3, true); hush_from = T(b) + Bt; break;
           case kClimb: f = drum.fill(groove::kToms, 4, true); break;
           default: f = drum.fill(groove::kDrop, 4, true); hush_from = T(b); break;
@@ -593,7 +649,10 @@ struct Conductor::Impl {
     } else if (left == 1) {
       if (settle_kind == kHush) hush_from = T(b) + (1 + I(2)) * Bt;
       if (settle_kind == kRing) { hush_from = T(b) + 2 * Bt; n(T(b) + 2 * Bt, 2, "taiko", LO, .5f); }
-      if (U() < .6) { int r = nxt.key - 12; for (int iv : nxt.voicing) n(XT - BR * (U() < .5 ? 1 : .5), 3 * BR, "horn", r + iv, .2f); }
+      if (U() < .6) {                                 /* the new key's tonic chord (minor), from the downbeat, not over the old chord */
+        int r = nxt.key - 12;
+        for (int iv : nxt.voicing) { int o = ((iv % 12) + 12) % 12; int t3 = o == 0 ? 0 : o <= 4 ? 3 : o <= 8 ? 7 : o <= 10 ? 10 : 12; n(XT, 3 * BR, "horn", r + iv - o + t3, .2f); }
+      }
       if (U() < .7) {
         motif::Line dn = garden.pickup(nch, false, 2 + I(3)); double len = 0; for (auto& q : dn) len += q.beats;
         double t = XT - len * Bt; int top = -dn.back().deg;
