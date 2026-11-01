@@ -50,7 +50,7 @@ public final class Screens {
         g.text(s.runName,261,46,Gfx.MONO,13,Theme.TEXT,Gfx.LEFT,.03f);
         g.text(s.leader+" / "+s.flavour,261,64,Gfx.MONO,9,Theme.MUTED,Gfx.LEFT,.06f);
         float ex=W-506;
-        String key=e.text(Engine.MOOD).toUpperCase(Locale.ROOT)+"   "+e.text(Engine.TEMPO).toUpperCase(Locale.ROOT);
+        String key=listName(Engine.MOOD,MOODS).toUpperCase(Locale.ROOT)+"   "+e.text(Engine.TEMPO).toUpperCase(Locale.ROOT);
         g.text(key,ex-13,47,Gfx.MONO,12,Theme.PHOSPHOR,Gfx.RIGHT,.04f);
         g.text("RUN ELAPSED / LENGTH",ex,32,Gfx.MONO,7.5f,Theme.MUTED,Gfx.LEFT,.12f);
         g.text(clock(s.runElapsed)+" / "+(s.runLength==0?"CONTINUOUS":clock(s.runLength)),ex,52,Gfx.MONO,14,Theme.TEXT,Gfx.LEFT,0);
@@ -129,9 +129,9 @@ public final class Screens {
         float gap=8,unit=(w-gap*5)/6.4f;
         float bw=unit*1.05f,mw=unit*1.15f,hw=unit*.8f,sw=unit*1.05f,lw=w-bw-mw-hw*2-sw-gap*5;
         float cx=x;
-        ui.tile("biome",cx,y,bw,h,"BIOME",e.text(Engine.BIOME).toUpperCase(Locale.ROOT),
+        ui.tile("biome",cx,y,bw,h,"BIOME",listName(Engine.BIOME,BIOMES).toUpperCase(Locale.ROOT),
             ()->choose("Biome",BIOMES,e.value(Engine.BIOME),v->e.set(Engine.BIOME,v)));cx+=bw+gap;
-        ui.tile("mood",cx,y,mw,h,"MUSIC MOOD",e.text(Engine.MOOD).toUpperCase(Locale.ROOT),
+        ui.tile("mood",cx,y,mw,h,"MUSIC MOOD",listName(Engine.MOOD,MOODS).toUpperCase(Locale.ROOT),
             ()->choose("Music mood",MOODS,e.value(Engine.MOOD),v->e.set(Engine.MOOD,v)));cx+=mw+gap;
         g.text("DRIFT / HARMONY",cx,y+11,Gfx.MONO,9.5f,Theme.MUTED,Gfx.LEFT,.06f);
         boolean hold=e.value(Engine.HOLD)!=0;
@@ -188,6 +188,11 @@ public final class Screens {
             x+=widths[i]+12;
         }
     }
+    /** The interface's full name for a list value; the firmware's own text is abbreviated for its small screen. */
+    private String listName(int slot,String[] names){
+        int v=e.value(slot)-e.min(slot);
+        return v>=0&&v<names.length?names[v]:e.text(slot);
+    }
     private String role(int part){return e.text(Engine.ROLE+part).toUpperCase(Locale.ROOT);}
     private void chooseSlot(String title,final int slot){
         String[] names=e.names(slot);if(names==null||names.length==0)return;
@@ -206,7 +211,7 @@ public final class Screens {
         float top=y+65,bottom=y+h;
         if(s.mixerPage==0){
             float outH=128,gap=13,cw=(w-gap*3)/4;
-            for(int p=0;p<4;p++)partCard(p,x+p*(cw+gap),top,cw,bottom-outH-top,!focus);
+            for(int p=0;p<4;p++)partCard(p,x+p*(cw+gap),top,cw,bottom-outH-10-top,!focus);
             output(x,bottom-outH,w,outH);
         }else layers(x,top,w,bottom-top);
     }
@@ -220,11 +225,11 @@ public final class Screens {
         ui.tile("part.voice."+p,x+15,ty,w-30,th,"VOICE",voice,()->{s.designPart=p;go(UiState.Screen.SOUND_DESIGN);});
         float ly=y+(compact?158:176);
         fader("part.level."+p,"Level",x,ly,w,e.value(Engine.LEVEL+p),e.min(Engine.LEVEL+p),e.max(Engine.LEVEL+p),val->e.set(Engine.LEVEL+p,val));
-        float my=y+(compact?222:258),mh=compact?52:60,half=(w-30-10)/2;
+        float my=y+(compact?220:250),mh=compact?52:60,half=(w-30-10)/2;
         muteButton("part.mute."+p,x+15,my+(mh-47)/2,half,47,Engine.MUTE+p);
         panTile("part.pan."+p,x+15+half+10,my,half,mh,p);
-        float ry=y+(compact?282:332);
-        ui.tile("part.role."+p,x+15,ry,w-30,compact?50:60,"ROLE",role(p),()->chooseSlot("Part "+(p+1)+" role",Engine.ROLE+p));
+        float ry=y+(compact?278:318);
+        ui.tile("part.role."+p,x+15,ry,w-30,compact?46:60,"ROLE",role(p),()->chooseSlot("Part "+(p+1)+" role",Engine.ROLE+p));
     }
     private void muteButton(String id,float x,float y,float w,float h,final int slot){
         final boolean muted=e.value(slot)!=0;
