@@ -165,3 +165,11 @@ Check on the SM-T510 (and the Tab S6 Lite when available), in Focus and Performa
    Record and leave the app; reopen and confirm the take is saved.
 8. Run timer: choose Custom 5 min on Start, Start a new run, start the environment with a take recording;
    at 5:00 confirm the five-second fade, Run complete, the take saved and including the fade.
+9. Expedition: Move on walks the route on the Survey; an encounter card appears; View encounter shows
+   its stages and tapping an earlier stage shows its text. Danger and Majesty match INSTRUMENT.
+10. Valley Survey: pan with one finger, pinch to zoom, and confirm the labels stay the same size at
+    every zoom. View tools: Zoom +/-, Centre on me, Whole valley. Plot a path with a few taps; the
+    footer reads YOUR PATH / OVERRIDE; Clear path returns to ROUTE AHEAD.
+11. Journal and Bestiary: the encounter's page and plate appear; Open bestiary selects it; Read
+    first encounter returns to its page. Start: pick Jonesy and a new seed, Begin expedition, and
+    confirm a new valley, base camp and the header naming the new run.

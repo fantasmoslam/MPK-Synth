@@ -46,6 +46,40 @@ public final class UiState {
     public final String[] responseText=new String[8];
 
     public String runName="LOWLAND STUDY",leader="WELLINGTON",flavour="CINEMATIC";
+
+    // ---- expedition ----------------------------------------------------------------------
+    public static final String[] LEADERS={"WELLINGTON","VERONICA","JONESY"},FLAVOURS={"CINEMATIC","LO-FI","DARK AMBIENT"};
+    /** The current run's valley and leader, and the choices for the next run (Start). */
+    public int valleySeed=472,nextSeed=472,leaderIndex,nextLeader;
+    private Expedition expedition;
+    private String expeditionSaved;
+    /** The current run's expedition, made from the valley seed on first use. */
+    public Expedition expedition(){
+        if(expedition==null||expedition.valley.seed!=valleySeed){
+            expedition=new Expedition(valleySeed,LEADERS[leaderIndex]);
+            expedition.load(expeditionSaved);expeditionSaved=null;
+            Valley.Place camp=expedition.valley.stations[0];
+            runName=Valley.HABITAT[expedition.valley.terrainAt(camp.x,camp.y)]+" STUDY";
+            leader=LEADERS[leaderIndex];flavour=FLAVOURS[leaderIndex];
+        }
+        return expedition;
+    }
+    /** Starts the next run's expedition: its seed and leader become current. */
+    public void beginExpedition(){
+        valleySeed=nextSeed;leaderIndex=nextLeader;expedition=null;expeditionSaved=null;override=null;
+        mapScale=0;encounterOpen=false;journalPage=-1;expedition();
+    }
+    /** Expedition sub-views: the full map, its tools and path plotting, the encounter. */
+    public boolean mapOpen,mapTools,plotting,encounterOpen;
+    /** Map view centre in valley units and zoom (0 fits the whole valley). */
+    public float mapX=500,mapY=300,mapScale;
+    /** Your plotted path in valley units, or null when the conductor chooses the route. */
+    public float[] override;
+    /** The encounter stage being read, or -1 to follow the live stage. */
+    public int encounterStage=-1;
+    /** Journal entry shown (-1 latest); bestiary page, selection (-1 none) and group filter (-1 all). */
+    public int journalPage=-1,bestiaryPage,bestiarySelected=-1,bestiaryGroup=-1;
+    public boolean bestiaryByName;
     /** Run clock in milliseconds; length 0 is Continuous. */
     public long runElapsed,runLength=30*60000L;
     /** The length the next run uses; changes made during a run apply to the next one. */
@@ -69,12 +103,15 @@ public final class UiState {
         b.append(';').append(designPart).append(';').append(mixerPage);
         b.append(';').append(runElapsed).append(';').append(runLength).append(';').append(nextRunLength)
          .append(';').append(runPhase==ENDING?ENDED:runPhase).append(';').append(runNumber);
+        b.append(';').append(valleySeed).append(';').append(nextSeed).append(';').append(leaderIndex).append(';').append(nextLeader)
+         .append(';').append(expedition==null?(expeditionSaved==null?"":expeditionSaved):expedition.save()).append(';');
+        if(override!=null)for(int i=0;i<override.length;i++)b.append(i>0?":":"").append(Math.round(override[i]));
         return b.toString();
     }
     public void load(String saved){
         if(saved==null)return;
         try{
-            String[] p=saved.split(";");
+            String[] p=saved.split(";",-1);
             layout=Layout.valueOf(p[0]);
             for(int i=0;i<8&&i+2<p.length;i++)notes[i]=Math.max(0,Math.min(100,Integer.parseInt(p[i+2])));
             for(int i=0;i<8&&i+10<p.length;i++)layerMuted[i]=Math.max(-1,Math.min(100,Integer.parseInt(p[i+10])));
@@ -84,6 +121,16 @@ public final class UiState {
                 runElapsed=Math.max(0,Long.parseLong(p[20]));runLength=Math.max(0,Long.parseLong(p[21]));
                 nextRunLength=Math.max(0,Long.parseLong(p[22]));runPhase=Math.max(0,Math.min(ENDED,Integer.parseInt(p[23])));
                 runNumber=Math.max(1,Integer.parseInt(p[24]));endDismissed=runPhase==ENDED;
+            }
+            if(p.length>29){
+                valleySeed=Math.max(0,Math.min(9999,Integer.parseInt(p[25])));nextSeed=Math.max(0,Math.min(9999,Integer.parseInt(p[26])));
+                leaderIndex=Math.max(0,Math.min(2,Integer.parseInt(p[27])));nextLeader=Math.max(0,Math.min(2,Integer.parseInt(p[28])));
+                expeditionSaved=p[29];expedition=null;
+                override=null;
+                if(p.length>30&&!p[30].isEmpty()){
+                    String[] q=p[30].split(":");
+                    if(q.length>=2&&q.length%2==0){override=new float[q.length];for(int i=0;i<q.length;i++)override[i]=Float.parseFloat(q[i]);}
+                }
             }
             screen=Screen.valueOf(p[1]); // last: screens from older versions (the legacy panel) fall back to INSTRUMENT
         }catch(RuntimeException ignored){}

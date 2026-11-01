@@ -145,6 +145,18 @@ public final class Preview {
         public void action(String name){}
     }
 
+    /** Walks the stand-in expedition to station 7 with a few encounters, then meets a herd. */
+    static void walk(UiState state,int stage){
+        Expedition ex=state.expedition();
+        while(ex.station<6){
+            if(ex.current()!=null)for(int i=0;i<8&&ex.current()!=null;i++)ex.act(Expedition.OBSERVE);
+            else ex.act(Expedition.MOVE_ON);
+        }
+        if(ex.current()!=null)for(int i=0;i<8&&ex.current()!=null;i++)ex.act(Expedition.OBSERVE);
+        ex.act(Expedition.FOLLOW_HERD);
+        for(int i=0;i<stage;i++)ex.act(Expedition.OBSERVE);
+        ex.requested=Expedition.OBSERVE;
+    }
     public static void main(String[] args)throws Exception{
         File out=new File(args[0]);out.mkdirs();String fonts=args[1];
         String[][] shots={
@@ -163,7 +175,14 @@ public final class Preview {
             {"focus-instrument-recording","FOCUS","INSTRUMENT"},
             {"focus-runlength","FOCUS","START"},{"focus-runend-ending","FOCUS","EXPEDITION"},
             {"focus-runend-ended","FOCUS","EXPEDITION"},{"focus-runend-ended-no-take","FOCUS","EXPEDITION"},
-            {"performance-runend-ended","PERFORMANCE","EXPEDITION"}};
+            {"performance-runend-ended","PERFORMANCE","EXPEDITION"},
+            {"focus-expedition","FOCUS","EXPEDITION"},{"focus-expedition-idle","FOCUS","EXPEDITION"},
+            {"focus-map","FOCUS","EXPEDITION"},{"performance-map","PERFORMANCE","EXPEDITION"},{"focus-map-tools","FOCUS","EXPEDITION"},
+            {"focus-map-zoom","FOCUS","EXPEDITION"},{"focus-map-override","FOCUS","EXPEDITION"},
+            {"focus-encounter-naming","FOCUS","EXPEDITION"},{"focus-encounter-signs","FOCUS","EXPEDITION"},{"performance-encounter-naming","PERFORMANCE","EXPEDITION"},
+            {"focus-journal","FOCUS","JOURNAL"},{"performance-journal","PERFORMANCE","JOURNAL"},
+            {"focus-bestiary","FOCUS","BESTIARY"},{"performance-bestiary","PERFORMANCE","BESTIARY"},
+            {"focus-start","FOCUS","START"},{"performance-start","PERFORMANCE","START"}};
         for(String[] shot:shots)for(int width:new int[]{1920,2000}){
             float scale=1.5f;BufferedImage img=new BufferedImage(width,1200,BufferedImage.TYPE_INT_RGB);
             Graphics2D g=img.createGraphics();g.scale(scale,scale);
@@ -179,6 +198,17 @@ public final class Preview {
             if(shot[0].contains("runend-ended")&&!shot[0].endsWith("no-take"))engine.recState=Recorder.SAVED;
             if(shot[0].contains("runend-ending"))engine.recState=Recorder.RECORDING;
             if(shot[0].contains("runend")){state.runElapsed=state.runLength;state.runPhase=shot[0].contains("ending")?UiState.ENDING:UiState.ENDED;}
+            if(!shot[0].endsWith("idle"))walk(state,shot[0].contains("signs")?0:3);
+            if(shot[0].contains("map")){state.mapOpen=true;}
+            if(shot[0].endsWith("tools"))state.mapTools=true;
+            if(shot[0].endsWith("zoom")){Valley.Place p=state.expedition().place();state.mapScale=2.2f;state.mapX=p.x;state.mapY=p.y;}
+            if(shot[0].endsWith("override")){
+                Valley v=state.expedition().valley;Valley.Place a=v.landmarks[0],p=state.expedition().place();
+                state.override=new float[]{(p.x*2+a.x)/3,(p.y*2+a.y)/3+18,a.x,a.y};state.plotting=true;
+            }
+            if(shot[0].contains("encounter"))state.encounterOpen=true;
+            if(shot[0].contains("bestiary")){Expedition ex=state.expedition();state.bestiarySelected=ex.encounters.get(ex.encounters.size()-1).species;}
+            if(shot[0].contains("start"))state.nextLeader=1;
             long now=shot[0].contains("ending")?3000:0;
             if(shot[0].endsWith("runlength"))screens.openRunLength();
             if(shot[0].endsWith("biome-sheet"))screens.choose("Biome",Screens.BIOMES,1,v->{});

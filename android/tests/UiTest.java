@@ -6,7 +6,7 @@ import java.util.ArrayList;
 /** Host checks of the round-three interface rules, without Android. */
 public final class UiTest {
     /** Records what is drawn; text widths are approximate. */
-    static final class RecordingGfx implements Gfx {
+    static class RecordingGfx implements Gfx {
         final ArrayList<float[]> lines=new ArrayList<>();final ArrayList<String> texts=new ArrayList<>();
         public void rect(float x,float y,float w,float h,int c){}
         public void frame(float x,float y,float w,float h,float width,int c){}
@@ -184,6 +184,90 @@ public final class UiTest {
             throw new AssertionError("run clock survives saving; an interrupted fade comes back ended");
         copy=new UiState();copy.load("FOCUS;LEGACY;1;2;3;4;5;6;7;8");
         if(copy.screen!=UiState.Screen.INSTRUMENT||copy.notes[7]!=8)throw new AssertionError("a saved legacy screen falls back to INSTRUMENT");
-        System.out.println("PASS: interface rules (knob zero, layouts, dragging, Stop All over sheets and quick mix, dock, sound design, layer mutes, run timer and end, saved state)");
+        expedition();
+        System.out.println("PASS: interface rules (knob zero, layouts, dragging, Stop All over sheets and quick mix, dock, sound design, layer mutes, run timer and end, saved state, valley, expedition, map, journal, bestiary, start)");
+    }
+
+    /** The seeded valley, the stand-in expedition, the map's touch handling and the expedition screens. */
+    static void expedition(){
+        // The same seed gives the same valley; another seed gives another one.
+        Valley a=new Valley(472),b=new Valley(472),c=new Valley(9071);
+        if(a.stations[7].x!=b.stations[7].x||!a.regions[3].name.equals(b.regions[3].name))throw new AssertionError("valley is seeded");
+        if(a.stations[7].x==c.stations[7].x&&a.stations[7].y==c.stations[7].y)throw new AssertionError("seeds differ");
+        for(int seed=0;seed<200;seed++){
+            Valley v=new Valley(seed);
+            if(v.stations.length!=16||v.regions.length!=7||v.river.length<8)throw new AssertionError("valley parts, seed "+seed);
+            for(Valley.Place p:v.stations)if(!Valley.inside(v.outline,p.x,p.y))throw new AssertionError("station inside the valley, seed "+seed);
+            for(Valley.Place p:v.stations)if(Valley.inside(v.lake,p.x,p.y))throw new AssertionError("no station in the lake, seed "+seed);
+            java.util.HashSet<Integer> t=new java.util.HashSet<>();for(Valley.Region r:v.regions)t.add(r.terrain);
+            if(t.size()!=7)throw new AssertionError("seven terrains, seed "+seed);
+        }
+        // Move on walks the route; encounters run through their eight stages; the journal and bestiary follow.
+        Expedition ex=new Expedition(472,"WELLINGTON");
+        if(ex.journal().size()!=1)throw new AssertionError("journal opens at base camp");
+        int guard=0;
+        while(ex.encounters.isEmpty()&&guard++<20)ex.act(Expedition.MOVE_ON);
+        Expedition.Encounter e=ex.current();
+        if(e==null||e.stage!=0||e.identified())throw new AssertionError("an encounter starts with signs");
+        for(int i=0;i<7;i++)ex.act(Expedition.OBSERVE);
+        if(e.stage!=7||!e.identified()||ex.firstEncounter(e.species)!=0||ex.discovered()!=1)throw new AssertionError("observing reaches the coda and records the species");
+        boolean entry=false;for(Expedition.Entry j:ex.journal())if(j.species==e.species)entry=true;
+        if(!entry)throw new AssertionError("the encounter is in the journal");
+        for(int i=0;i<8;i++)if(ex.stageLine(e,i).isEmpty())throw new AssertionError("stage wording");
+        ex.act(Expedition.OBSERVE);if(ex.current()!=null)throw new AssertionError("encounter ends after the coda");
+        int at=ex.station;ex.act(Expedition.MOVE_ON);if(ex.station!=at+1)throw new AssertionError("move on");
+        Expedition back=new Expedition(472,"WELLINGTON");back.load(ex.save());
+        if(back.station!=ex.station||back.encounters.size()!=ex.encounters.size()||back.discovered()!=ex.discovered())throw new AssertionError("expedition round trip");
+        // While the run clock counts, the company moves on by itself.
+        Expedition timed=new Expedition(5,"VERONICA");timed.tick(60000,false,30*60000L);
+        if(timed.station!=0)throw new AssertionError("the expedition waits for sound");
+        for(int i=0;i<40&&timed.station==0;i++)timed.tick(30000,true,30*60000L);
+        if(timed.station==0)throw new AssertionError("the expedition travels while the run plays");
+
+        // Expedition screens in both layouts at both widths.
+        UiState s=new UiState();FakeEngine fe=new FakeEngine();Ui ui=new Ui();Screens sc=new Screens(ui,s,fe);
+        s.expedition().act(Expedition.FOLLOW_HERD);
+        for(UiState.Layout l:UiState.Layout.values())for(float w:new float[]{1280,1333})for(int view=0;view<6;view++){
+            s.layout=l;s.mapOpen=view==1;s.mapTools=view==1;s.encounterOpen=view==2;
+            s.screen=view<3?UiState.Screen.EXPEDITION:view==3?UiState.Screen.JOURNAL:view==4?UiState.Screen.BESTIARY:UiState.Screen.START;
+            RecordingGfx g=new RecordingGfx();ui.begin(g,w,800,0);sc.draw();ui.end();
+            if(!g.texts.contains("STOP ALL"))throw new AssertionError("Stop All on "+l+" view "+view);
+            if(view==0&&!g.texts.contains("YOU ARE HERE"))throw new AssertionError("survey shows the position");
+            if(view==1&&(!g.texts.contains("TERRAIN KEY")||!g.texts.contains("Whole valley")))throw new AssertionError("map key and tools");
+        }
+        // Labels keep one on-screen size at every zoom (review amendment 1).
+        s.layout=UiState.Layout.FOCUS;s.screen=UiState.Screen.EXPEDITION;s.mapOpen=true;s.mapTools=false;s.mapScale=0;
+        float[] sizes=new float[2];
+        for(int z=0;z<2;z++){
+            if(z==1)s.mapScale=3;
+            SizeGfx g=new SizeGfx();ui.begin(g,1280,800,0);sc.draw();ui.end();
+            sizes[z]=g.size("YOU ARE HERE");
+        }
+        if(sizes[0]<=0||sizes[0]!=sizes[1])throw new AssertionError("map labels stay one size when zoomed: "+sizes[0]+" vs "+sizes[1]);
+        // Pinch zooms, one finger pans, and a tap while plotting adds a point to your path.
+        s.mapScale=0;ui.begin(new RecordingGfx(),1280,800,0);sc.draw();ui.end();
+        float mx=140+400,my=94+64+200;
+        ui.down(1,mx-40,my);ui.down(2,mx+40,my);ui.move(1,mx-90,my);ui.move(2,mx+90,my);ui.up(1,mx-90,my);ui.up(2,mx+90,my);
+        if(s.mapScale<=0)throw new AssertionError("pinch zooms in");
+        float cx=s.mapX;ui.begin(new RecordingGfx(),1280,800,0);sc.draw();ui.end();
+        ui.down(3,mx,my);ui.move(3,mx-60,my);ui.up(3,mx-60,my);
+        if(s.mapX<=cx)throw new AssertionError("dragging left pans east");
+        s.plotting=true;s.override=null;s.mapScale=0;ui.begin(new RecordingGfx(),1280,800,0);sc.draw();ui.end();
+        Valley.Place here=s.expedition().place();
+        float k=ValleyMap.fit(s.expedition().valley,1123-214,591-64-77),tx=140+(1123-214)/2f+(here.x-s.mapX)*k+20,ty=94+64+(591-64-77)/2f+(here.y-s.mapY)*k;
+        ui.down(4,tx,ty);ui.up(4,tx,ty);
+        if(s.override==null||s.override.length!=2)throw new AssertionError("a tap adds a path point");
+        UiState copy=new UiState();copy.load(s.save());
+        if(copy.override==null||copy.override.length!=2||copy.valleySeed!=s.valleySeed||!copy.expedition().save().equals(s.expedition().save()))
+            throw new AssertionError("expedition, seed and path survive saving");
+        // Start: the chosen leader and seed take over when a new run begins.
+        s.nextLeader=2;s.nextSeed=1234;sc.run.newRun();
+        if(s.valleySeed!=1234||!s.leader.equals("JONESY")||s.expedition().station!=0||s.override!=null)throw new AssertionError("new run applies leader and seed");
+    }
+    /** Records the size each text was drawn at. */
+    static final class SizeGfx extends RecordingGfx{
+        final java.util.HashMap<String,Float> sizes=new java.util.HashMap<>();
+        @Override public void text(String t,float x,float y,int f,float size,int c,int a,float tr){super.text(t,x,y,f,size,c,a,tr);sizes.put(t,size);}
+        float size(String t){Float v=sizes.get(t);return v==null?-1:v;}
     }
 }
