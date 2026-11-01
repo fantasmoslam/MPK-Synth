@@ -595,6 +595,7 @@ double Engine::last_load() const { return p->load; }
 int Engine::active_voices() const { int n = 0; for (auto& P : p->parts) n += int(P.act.size()); return n; }
 
 void Engine::push(const Event& e) {
+  if (p->o.on_event) p->o.on_event(p->o.on_event_ctx, 0, e, 0, e.t);
   if (e.part == "subdrop") {
     Impl::Op op; op.kind = 4; Impl::Shot& s = op.shot; int sr = p->sr; s.start = (long long)(e.t * sr); int n = int(1.8 * sr); s.L.resize(n); double ph = 0;
     for (int i = 0; i < n; i++) { double tt = double(i) / sr, f = 60 * exp(-tt * 1.2) + 28; ph += 2 * 3.14159265358979 * f / sr; s.L[i] = float(sin(ph) * exp(-tt * 2.2) * e.vel); }
@@ -604,10 +605,12 @@ void Engine::push(const Event& e) {
 }
 int Engine::hold(const Event& e) {
   Impl::Op op; op.kind = 1; op.e = e; op.e.d = 1e6; int h; { std::lock_guard<std::mutex> l(p->inbox_m); h = p->next_handle++; }
-  op.handle = h; p->post(std::move(op)); return h;
+  op.handle = h; p->post(std::move(op));
+  if (p->o.on_event) p->o.on_event(p->o.on_event_ctx, 1, e, h, e.t);
+  return h;
 }
-void Engine::release(int handle, double t) { Impl::Op op; op.kind = 2; op.handle = handle; op.t = t; p->post(std::move(op)); }
-void Engine::cancel_from(double t) { Impl::Op op; op.kind = 3; op.t = t; p->post(std::move(op)); }
+void Engine::release(int handle, double t) { if (p->o.on_event) p->o.on_event(p->o.on_event_ctx, 2, Event(), handle, t); Impl::Op op; op.kind = 2; op.handle = handle; op.t = t; p->post(std::move(op)); }
+void Engine::cancel_from(double t) { if (p->o.on_event) p->o.on_event(p->o.on_event_ctx, 3, Event(), 0, t); Impl::Op op; op.kind = 3; op.t = t; p->post(std::move(op)); }
 void Engine::push_riser(double t_hit, double secs, float level, int root) {
   int sr = p->sr;
   if (!p->riser_rv) { p->riser_rv = make_reverb(); p->riser_rv->init(sr); p->riser_rv->buildUserInterface(&p->riser_p);

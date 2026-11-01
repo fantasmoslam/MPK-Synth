@@ -23,7 +23,10 @@ enum class Lead { horn, fiddle, choir, blend, all };   /* all: every lead part o
 enum class Ostinato { spiccato, mouthbow, both };
 struct Options { int sample_rate = 48000; int threads = 0; /* 0 = all but one core */ Lead lead = Lead::fiddle;
                  Ostinato ostinato = Ostinato::spiccato;
-                 void (*on_worker)() = nullptr;   /* called on each helper thread as it starts (e.g. to raise its priority) */ };
+                 void (*on_worker)() = nullptr;   /* called on each helper thread as it starts (e.g. to raise its priority) */
+                 /* for checking tools: every event as it is pushed or held (handle 0 for a plain note), each release
+                    and each cancel_from, with ctx. Null in the app. */
+                 void (*on_event)(void* ctx, int kind, const Event& e, int handle, double t) = nullptr; void* on_event_ctx = nullptr; };
 
 class Engine {
  public:
