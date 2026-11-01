@@ -73,7 +73,9 @@ public final class MainActivity extends Activity {
             lastReport=now;String report=Native.report();
             if(report!=null)Log.i("PaleotoneAudio",Build.MODEL+" | "+report);
         }
-        view.screens.run.tick(now,lastTick==0?0:now-lastTick,running);
+        // The run clock counts while the expedition is sounding, not merely while the audio stream is open.
+        boolean live=running&&(engine.value(org.paleotone.synth.ui.Engine.HABITAT)>0||engine.musicPlaying());
+        view.screens.run.tick(now,lastTick==0?0:now-lastTick,live);
         lastTick=now;
         if(++tick%3==0)engine.refresh();
         view.tick();

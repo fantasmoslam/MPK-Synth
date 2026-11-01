@@ -2,7 +2,7 @@
 package org.paleotone.synth.ui;
 
 /**
- * The run clock and its end. The clock counts while audio runs. At a timed run's
+ * The run clock and its end. The clock counts while the environment or music plays. At a timed run's
  * length (or End run on any run) the clock holds, the whole mix fades over five
  * seconds (an active take records the fade), then the take is saved and audio stops.
  * Stop All during the fade ends at once, keeping what was recorded.

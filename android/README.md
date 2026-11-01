@@ -45,7 +45,7 @@ sh android/preview/render.sh build/preview
   restart) and blocks new takes until it is saved or discarded. Leaving the app or Stop All saves
   the active take.
 - **Run timer:** 15, 30, 60, 120 minutes, Continuous, or Custom (5–240). The run clock counts while
-  audio runs; a new length applies to the next run (Start, or Start a new run). At the length, or
+  the environment or music plays; a new length applies to the next run (Start, or Start a new run). At the length, or
   on End run, the clock holds, the mix fades over five seconds (an active take records the fade),
   then the take saves and audio stops. Stop All or Stop now during the fade ends at once.
 - **Run end:** the closing card during the fade, then Run complete with the take's name and length,
