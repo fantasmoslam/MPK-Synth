@@ -51,6 +51,14 @@ sh android/preview/render.sh build/preview
 - **Run end:** the closing card during the fade, then Run complete with the take's name and length,
   or No recording.
 
+**The old DINOBOX Scape is switched off** (Dylan, 1 November 2026). Its habitat, drone, creature
+calls and loop music came from the FM-1 firmware and do not belong in the rebuild. The firmware still
+contains it; the tablet never starts it (`PT_OLD_SCAPE` in `native/android_audio.c` refuses Scape
+commands, holds the habitat, drone, layer, evolving-music and transport controls, and clears a saved
+session's Scape at launch). Environment, Drone, the habitat layers and Music show as waiting for the new
+engine until the new conductor and habitat are ported. MIDI, the four synth parts, sound design and the
+sample layer are unaffected. The run clock therefore stays still for now.
+
 Knobs follow the review's zero rule: unipolar knobs sweep from 7 o'clock to 5 o'clock; only
 engine-marked bipolar parameters point to 12 at zero, with a centre tick. Not built yet: the
 notes are saved but not connected (their gauges show a dash, phase 4); the expedition, map,

@@ -138,7 +138,7 @@ public final class Screens {
         g.text("DRIFT / HARMONY",cx,y+11,Gfx.MONO,9.5f,Theme.MUTED,Gfx.LEFT,.06f);
         boolean hold=e.value(Engine.HOLD)!=0;
         ui.button("hold",cx,y+20,hw,h-20,"Hold",hold?Ui.SELECTED:Ui.NORMAL,true,()->e.set(Engine.HOLD,hold?0:1));cx+=hw+gap/2;
-        boolean canNext=e.musicPlaying()&&e.value(Engine.EVOLVING)!=0;
+        boolean canNext=e.habitatEngine()&&e.musicPlaying()&&e.value(Engine.EVOLVING)!=0;
         ui.button("next",cx,y+20,hw,h-20,"Next",Ui.NORMAL,canNext,()->e.scape(Engine.SCAPE_NEXT_HARMONY));cx+=hw+gap*1.5f;
         ui.button("sounddesign",cx,y,sw,h,"Sound design",Ui.NORMAL,true,()->go(UiState.Screen.SOUND_DESIGN));cx+=sw+gap;
         ui.button("levels",cx,y,lw,h,"Levels & parts",Ui.NORMAL,true,()->go(UiState.Screen.MIXER));
@@ -146,8 +146,10 @@ public final class Screens {
     private void liveBalance(float x,float y,float w,float h){
         ui.panel(x,y,w,h);
         g.text("LIVE BALANCE",x+14,y+29,Gfx.DISPLAY,14.5f,Theme.PHOSPHOR,Gfx.LEFT,.02f);
-        fader("balance.environment","Environment",x,y+63,w,e.value(Engine.HABITAT),e.min(Engine.HABITAT),e.max(Engine.HABITAT),v->e.set(Engine.HABITAT,v));
-        fader("balance.drone","Drone",x,y+147,w,e.value(Engine.DRONE),e.min(Engine.DRONE),e.max(Engine.DRONE),v->e.set(Engine.DRONE,v));
+        if(e.habitatEngine()){
+            fader("balance.environment","Environment",x,y+63,w,e.value(Engine.HABITAT),e.min(Engine.HABITAT),e.max(Engine.HABITAT),v->e.set(Engine.HABITAT,v));
+            fader("balance.drone","Drone",x,y+147,w,e.value(Engine.DRONE),e.min(Engine.DRONE),e.max(Engine.DRONE),v->e.set(Engine.DRONE,v));
+        }else{waitingFader("Environment",x,y+63,w);waitingFader("Drone",x,y+147,w);}
         fader("balance.master","Master",x,y+231,w,e.master(),0,1023,e::setMaster);
         ui.button("quickmix.open",x+14,y+296,w-28,47,"Open quick mix",Ui.NORMAL,true,()->s.quickMix=true);
         g.line(x+14,y+383,x+w-14,y+383,1,Theme.BORDER);
@@ -166,6 +168,13 @@ public final class Screens {
         ui.fader(id,x+16,y+24,w-50,value,min,max,set);
         g.text("0",x+14,y+45,Gfx.MONO,9.5f,Theme.MUTED,Gfx.LEFT,0);
         g.text("100",x+w-14,y+45,Gfx.MONO,9.5f,Theme.MUTED,Gfx.RIGHT,0);
+    }
+    /** A level that waits for the new habitat engine: label, an empty track, no handle. */
+    private void waitingFader(String label,float x,float y,float w){
+        g.text(label,x+14,y,Gfx.MONO,13,Theme.DIM,Gfx.LEFT,0);
+        g.text("NEW ENGINE",x+w-14,y,Gfx.MONO,9.5f,Theme.MUTED,Gfx.RIGHT,.06f);
+        g.rect(x+16,y+21,w-50,6,0xff202b1e);
+        g.text("Returns with the new habitat",x+14,y+45,Gfx.MONO,9.5f,Theme.DIM,Gfx.LEFT,0);
     }
     /** The understated wax-cylinder strip. */
     private void fieldRecord(float x,float y,float w,float h){
@@ -215,7 +224,13 @@ public final class Screens {
             float outH=128,gap=13,cw=(w-gap*3)/4;
             for(int p=0;p<4;p++)partCard(p,x+p*(cw+gap),top,cw,bottom-outH-10-top,!focus);
             output(x,bottom-outH,w,outH);
-        }else layers(x,top,w,bottom-top);
+        }else if(e.habitatEngine())layers(x,top,w,bottom-top);
+        else{
+            ui.panel(x,top,w,bottom-top);
+            g.text("HABITAT LAYERS",x+13,top+29,Gfx.DISPLAY,14.5f,Theme.PHOSPHOR,Gfx.LEFT,.02f);
+            g.text("The old DINOBOX habitat is switched off. Wind, water, rain, insects, frogs, birds, drips, rumble",x+13,top+64,Gfx.MONO,12.5f,Theme.TEXT,Gfx.LEFT,0);
+            g.text("and the drone return here with the new habitat engine.",x+13,top+85,Gfx.MONO,12.5f,Theme.TEXT,Gfx.LEFT,0);
+        }
     }
     private void partCard(final int p,float x,float y,float w,float h,boolean compact){
         ui.panel(x,y,w,h);
@@ -248,7 +263,8 @@ public final class Screens {
         g.text("Habitat levels remain one tap away",x+w-13,y+27,Gfx.MONO,11.5f,Theme.MUTED,Gfx.RIGHT,0);
         ui.hit("output.layers",x+w-280,y+6,270,32,()->s.mixerPage=1);
         float fw=(w-380)/2;
-        fader("output.environment","Environment",x,y+60,fw,e.value(Engine.HABITAT),e.min(Engine.HABITAT),e.max(Engine.HABITAT),v->e.set(Engine.HABITAT,v));
+        if(e.habitatEngine())fader("output.environment","Environment",x,y+60,fw,e.value(Engine.HABITAT),e.min(Engine.HABITAT),e.max(Engine.HABITAT),v->e.set(Engine.HABITAT,v));
+        else waitingFader("Environment",x,y+60,fw);
         fader("output.master","Master",x+fw,y+60,fw,e.master(),0,1023,e::setMaster);
         float tx=x+fw*2+10;
         ui.dragTile("output.tempo",tx,y+49,x+w-13-tx,58,"TEMPO",e.text(Engine.TEMPO).toUpperCase(Locale.ROOT),
@@ -714,13 +730,14 @@ public final class Screens {
     // ---- bottom bar ------------------------------------------------------------------------
     private void bottomBar(){
         g.line(16,698,W-16,698,1,Theme.BORDER);
-        boolean audio=e.audioOn(),env=audio&&e.value(Engine.HABITAT)>0,music=audio&&e.musicPlaying();
-        ui.button("transport.environment",16,714,145,47,env?"Pause environment":"Start environment",Ui.NORMAL,true,
+        boolean ready=e.habitatEngine();
+        boolean audio=e.audioOn(),env=ready&&audio&&e.value(Engine.HABITAT)>0,music=ready&&audio&&e.musicPlaying();
+        ui.button("transport.environment",16,714,145,47,env?"Pause environment":"Start environment",Ui.NORMAL,ready,
             ()->e.scape(env?Engine.SCAPE_PAUSE_ENVIRONMENT:Engine.SCAPE_START_ENVIRONMENT));
-        g.text(env?"ENVIRONMENT LIVE":"ENVIRONMENT OFF",16+72.5f,777,Gfx.MONO,9,env?Theme.PHOSPHOR:Theme.MUTED,Gfx.CENTER,.04f);
-        ui.button("transport.music",169,714,145,47,music?"Stop music":"Play music",Ui.NORMAL,true,
+        g.text(!ready?"NEW ENGINE PENDING":env?"ENVIRONMENT LIVE":"ENVIRONMENT OFF",16+72.5f,777,Gfx.MONO,9,env?Theme.PHOSPHOR:Theme.MUTED,Gfx.CENTER,.04f);
+        ui.button("transport.music",169,714,145,47,music?"Stop music":"Play music",Ui.NORMAL,ready,
             ()->e.scape(music?Engine.SCAPE_STOP_MUSIC:Engine.SCAPE_PLAY_MUSIC));
-        g.text(music?"MUSIC LIVE":"MUSIC STOPPED",169+72.5f,777,Gfx.MONO,9,music?Theme.PHOSPHOR:Theme.MUTED,Gfx.CENTER,.04f);
+        g.text(!ready?"NEW ENGINE PENDING":music?"MUSIC LIVE":"MUSIC STOPPED",169+72.5f,777,Gfx.MONO,9,music?Theme.PHOSPHOR:Theme.MUTED,Gfx.CENTER,.04f);
         ui.button("transport.stopall",323,723,128,47,"STOP ALL",Ui.STOP,true,run::stopAll);
         g.text(audio?"AUDIO ON":"AUDIO OFF",466,729,Gfx.MONO,9.5f,audio?Theme.PHOSPHOR:Theme.MUTED,Gfx.LEFT,.04f);
         final Recorder r=recorder();int rs=r==null?Recorder.READY:r.state();

@@ -97,6 +97,7 @@ final class NativeEngine implements Engine {
         voiceRead[part]=0;
     }
     public Library library(){return library;}
+    public boolean habitatEngine(){return false;}
     public Recorder recorder(){return recorder;}
     public void fade(int ms){Native.fade(ms);}
     public boolean faded(){return Native.faded();}

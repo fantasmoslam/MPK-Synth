@@ -15,6 +15,15 @@
 #include "sample_layer.h"
 #include "capture.h"
 static pt_capture capture;   /* recording tap and run-end fade on the final mix */
+/* The old DINOBOX Scape (habitat, drone, creature calls, loop music) is switched off in the
+ * round-three app until the new conductor and habitat replace it. The firmware keeps it;
+ * the tablet never starts it: Scape commands are refused, and the controls that would make
+ * it sound (habitat and drone levels, layer levels, evolving music, the sequence transport)
+ * are held at zero. MIDI, the synth parts and the sample layer are unaffected. */
+#define PT_OLD_SCAPE 0
+static int old_scape_control(unsigned slot){
+    return slot==13||slot==14||slot==23||(slot>=27&&slot<=34)||slot==pt_control_count();
+}
 
 #define JNI(name) Java_org_paleotone_synth_Native_##name
 #define PIXELS (240*240)
@@ -236,6 +245,7 @@ JNIEXPORT void JNICALL JNI(init)(JNIEnv *env,jclass cls,jbyteArray saved) {
     if (n>sizeof save_data) n=0;
     if (n) (*env)->GetByteArrayRegion(env,saved,0,(jsize)n,(jbyte*)save_data);
     pt_boot(n ? save_data : NULL,n); booted=1;
+    if(!PT_OLD_SCAPE)pt_scape(PT_SCAPE_STOP_ALL);   /* a saved session may have had it running */
     pt_display_boot(); display_stale=1;
 }
 JNIEXPORT jstring JNICALL JNI(start)(JNIEnv *env,jclass cls,jint buffers) {
@@ -362,6 +372,7 @@ JNIEXPORT jobjectArray JNICALL JNI(controlTexts)(JNIEnv *e,jclass c){
 }
 JNIEXPORT void JNICALL JNI(control)(JNIEnv *e,jclass c,jint slot,jint value){
     (void)e;(void)c;if(slot<0||(unsigned)slot>pt_control_count())return;
+    if(!PT_OLD_SCAPE&&old_scape_control((unsigned)slot))return;
     if(!stream){pt_control_set((unsigned)slot,value);display_stale=1;return;}
     atomic_store(&control_pending[slot],value);atomic_store_explicit(&control_dirty[slot],1,memory_order_release);
 }
@@ -389,6 +400,7 @@ static int command_push(uint32_t m){
 }
 JNIEXPORT jboolean JNICALL JNI(scape)(JNIEnv *e,jclass c,jint command){
     (void)e;(void)c;if(command<PT_ENV_START||command>PT_SCAPE_NEXT)return JNI_FALSE;
+    if(!PT_OLD_SCAPE&&command!=PT_SCAPE_STOP_ALL)return JNI_FALSE;
     if(!stream){pt_scape((unsigned)command);display_stale=1;return JNI_TRUE;}
     return command_push(0xf0|((unsigned)command<<8))?JNI_TRUE:JNI_FALSE;
 }

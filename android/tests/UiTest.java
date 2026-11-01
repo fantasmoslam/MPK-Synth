@@ -47,6 +47,7 @@ public final class UiTest {
         public void setEngine(int part,int engine){engineSet=engine;}
         public void setPreset(int part,int preset){}
         public Library library(){return null;}
+        public boolean habitatEngine(){return true;}
         final FakeRecorder recorder=new FakeRecorder();
         public Recorder recorder(){return recorder;}
         int fadeMs=-1;boolean faded;

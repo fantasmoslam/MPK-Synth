@@ -130,6 +130,7 @@ public final class Preview {
                 return new Take[]{t[0],t[1],new Take("Lowland-study-0472-take-03.wav",314,recState,null)};
             }
         };
+        public boolean habitatEngine(){return false;}
         public Recorder recorder(){return recorder;}
         public void fade(int ms){}
         public boolean faded(){return false;}

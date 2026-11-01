@@ -62,6 +62,11 @@ public interface Engine {
 
     /** Imported sounds for the keyboard and MIDI layer. */
     Library library();
+    /**
+     * False while the old DINOBOX Scape is switched off and the new conductor and habitat
+     * are not yet ported: the environment, drone, layers and music controls wait.
+     */
+    boolean habitatEngine();
     /** Recording takes of the final mix. */
     Recorder recorder();
     /** Fades the whole mix to silence over ms; 0 restores full level. */
