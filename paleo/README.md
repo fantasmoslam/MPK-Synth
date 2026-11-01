@@ -23,6 +23,18 @@ render matches v5 to within about 0.3 dB in every 8-second section.
 The batch-1 instruments have no song to match yet. Their gains were set against the STAMPEDE parts by active level
 (for example bone flute 4 dB under the fiddle, rasp 2 dB under the rattle). `scores/kit-demo.txt` plays all eight in one groove, and `scores/kit-demo2.txt` plays pack 2 in a dawn scene and a camp scene.
 
+## Recorded instruments
+
+`samples/lib` holds recorded folk and world instruments cut from VCSL (CC0): ocarina, alto and tenor recorders,
+bowed psaltery, wine glasses, folk harp, dan tranh, kalimba, mbira, balafon and marimba (credits in
+`samples/CREDITS.md`; orchestral libraries are not used). `engine/sampler.h` plays them as ordinary parts: each
+note takes the recording nearest its pitch, retuned, and held notes loop a crossfade baked in by `samples/build.py`.
+The library is loaded once per process (the programs look in `PALEO_SAMPLES`, `samples/lib`, `paleo/samples/lib`
+or beside the creature folder; the app reads `assets/samples`). Their levels in `kParts` come from
+`tools/calibrate_samples.cpp`: leads sit 2 to 4 dB under the fiddle, plucked and struck ones with the mouth bow.
+The conductor gives each scene its own lead, low double, ostinato, pads and plucked part from the voices that
+suit it, and keeps the new voices in their natural ranges.
+
 ## Creatures
 
 A creature cue in a score is `t 0 KIND MIDI GAIN [DISTANCE] [PAN]`. KIND is rex, sauropod, ptero, herd, screech,

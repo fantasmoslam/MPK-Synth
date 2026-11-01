@@ -26,6 +26,9 @@ dsp* make_mouthbow(); dsp* make_horn(); dsp* make_pipe(); dsp* make_fiddle(); ds
 dsp* make_boneflute(); dsp* make_panpipes(); dsp* make_bowedbone(); dsp* make_slitdrum(); dsp* make_claypot();
 dsp* make_framedrum(); dsp* make_rasp(); dsp* make_bullroarer();
 dsp* make_cbrecorder(); dsp* make_fujara(); dsp* make_uprightbass(); dsp* make_harmonium(); dsp* make_bugle(); dsp* make_guitar();
+#include "sampler.h"
+#define PALEO_SAMPLED(n) dsp* make_s_##n() { return new paleo::SampleDsp(#n); }
+PALEO_SAMPLED(ocarina) PALEO_SAMPLED(recorder) PALEO_SAMPLED(trecorder) PALEO_SAMPLED(psaltery) PALEO_SAMPLED(glass) PALEO_SAMPLED(folkharp) PALEO_SAMPLED(dantranh) PALEO_SAMPLED(kalimba) PALEO_SAMPLED(mbira) PALEO_SAMPLED(balafon) PALEO_SAMPLED(marimba) 
 
 namespace paleo {
 namespace {
@@ -73,6 +76,18 @@ const PartDef kParts[] = {
   {"harmonium",make_harmonium,Ctl::held,   24, 1, 0, .5f,  {0,     60,   7000, 0,   0,    0,    0,   .932f,     18,   -.2f,  0,   0,   0,    .5f,.3f,  .2f, 1}},
   {"bugle",    make_bugle,    Ctl::held,   8,  1, 0, .7f,  {0,     100,  8000, 0,   0,    0,    0,   1.8f,      11,   .3f,   .5f, .25f,.15f, .2f,.45f, 0,   1}},
   {"guitar",   make_guitar,   Ctl::held,   24, 1, 0, 3.0f, {0,     60,   9000, 0,   0,    0,    0,   .317f,     10,   .35f,  0,   0,   0,    .3f,.25f, .2f, 1}},
+  /* recorded instruments (paleo/samples: VCSL, CC0); k from paleo/tools/calibrate_samples.cpp */
+  {"ocarina",    make_s_ocarina,    Ctl::held, 24, 1, 0, .9f, {0,     80,   9000, 0,   0,    0,    0,   0.7687f,      14,   0.25f, .375f,.2f, .1f,  .3f,.35f, 0,   1}},
+  {"recorder",   make_s_recorder,   Ctl::held, 24, 1, 0, .9f, {0,     80,   9000, 0,   0,    0,    0,   1.0391f,      14,   -0.25f, .375f,.2f, .1f,  .3f,.35f, 0,   1}},
+  {"trecorder",  make_s_trecorder,  Ctl::held, 24, 1, 0, .9f, {0,     80,   9000, 0,   0,    0,    0,   1.2901f,      14,   0.20f, .375f,.2f, .1f,  .3f,.35f, 0,   1}},
+  {"psaltery",   make_s_psaltery,   Ctl::held, 24, 1, 0, .9f, {0,     80,   9000, 0,   0,    0,    0,   3.4942f,      14,   -0.10f, .375f,.2f, .1f,  .3f,.35f, 0,   1}},
+  {"glass",      make_s_glass,      Ctl::held, 24, 1, 0, .9f, {0,     80,   9000, 0,   0,    0,    0,   0.5335f,      14,   0.35f, .375f,.2f, .1f,  .3f,.35f, 0,   1}},
+  {"folkharp",   make_s_folkharp,   Ctl::held, 24, 1, 0, 4.5f, {0,     60,   9000, 0,   0,    0,    0,   0.7815f,      10,   0.35f, .25f,.25f,.12f, .3f,.3f,  .15f,1}},
+  {"dantranh",   make_s_dantranh,   Ctl::held, 24, 1, 0, 4.5f, {0,     60,   9000, 0,   0,    0,    0,   0.8554f,      10,   -0.30f, .25f,.25f,.12f, .3f,.3f,  .15f,1}},
+  {"kalimba",    make_s_kalimba,    Ctl::held, 24, 1, 0, 4.5f, {0,     60,   9000, 0,   0,    0,    0,   0.7551f,      10,   0.30f, .25f,.25f,.12f, .3f,.3f,  .15f,1}},
+  {"mbira",      make_s_mbira,      Ctl::held, 24, 1, 0, 4.5f, {0,     60,   9000, 0,   0,    0,    0,   0.7283f,      10,   -0.35f, .25f,.25f,.12f, .3f,.3f,  .15f,1}},
+  {"balafon",    make_s_balafon,    Ctl::held, 24, 1, 0, 4.5f, {0,     60,   9000, 0,   0,    0,    0,   0.8998f,      10,   0.25f, .25f,.25f,.12f, .3f,.3f,  .15f,1}},
+  {"marimba",    make_s_marimba,    Ctl::held, 24, 1, 0, 4.5f, {0,     60,   9000, 0,   0,    0,    0,   0.6209f,      10,   -0.20f, .25f,.25f,.12f, .3f,.3f,  .15f,1}},
 };
 const int kNumParts = int(sizeof kParts / sizeof kParts[0]);
 const float kCreatureK = 1.21192f;   /* mix4.py's level for the creature stem: -11.5 dB active over its RMS */

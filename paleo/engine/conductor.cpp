@@ -11,6 +11,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <map>
 #include <mutex>
 #include <random>
@@ -84,6 +85,10 @@ struct Conductor::Impl {
     int hr = 2; int lead_from = 0; int drums_from = 0; std::vector<int> voicing; int giant_bar = -1, giant2_bar = -1, peak_bar = -1;
     int braam_every = 4; int lift = 0, lift_bar = -1; float herd_peak = .55f, herd_width = .32f;
     std::vector<int> ost_iv; std::vector<float> ost_v; bool ost_on = true;
+    /* who plays: the lead, its low double, the high double in a fight, the ostinato, the pads, and a plucked
+       arpeggio in the calm scenes (null: nobody) */
+    const char* lead = "fiddle"; const char* lead2 = "horn"; const char* top = "fiddle"; const char* ost = "mouthbow";
+    const char* pad = "horn"; const char* pluck = nullptr; int pluck_style = 0;
   };
   Inst cur, nxt, prev; bool have_cur = false, have_prev = false; int quiet = 0, travels = 0, serial = 0;
   struct BarInfo { int scene; float e, th; int chord, key; int parts; int lead_notes; double t; };
@@ -129,8 +134,29 @@ struct Conductor::Impl {
     if (t < ramp_t0 || t >= ramp_t1) return 1;
     return ramp_v0 + (ramp_v1 - ramp_v0) * float((t - ramp_t0) / (ramp_t1 - ramp_t0));
   }
+  /* The comfortable range of the voices added with the recorded instruments (the original parts keep the
+     octaves they were approved with). */
+  static bool range_of(const std::string& p, int& lo, int& hi) {
+    static const std::map<std::string, std::pair<int, int>> r = {
+      {"ocarina", {69, 86}}, {"recorder", {65, 88}}, {"trecorder", {60, 83}}, {"psaltery", {58, 88}}, {"glass", {75, 88}},
+      {"folkharp", {43, 88}}, {"dantranh", {50, 83}}, {"kalimba", {59, 80}}, {"mbira", {43, 80}}, {"balafon", {54, 86}},
+      {"marimba", {45, 89}}, {"choir", {48, 74}}, {"boneflute", {62, 86}}, {"fujara", {48, 74}}, {"panpipes", {60, 86}},
+      {"bowedbone", {36, 62}}, {"bugle", {55, 77}}, {"harmonium", {41, 79}}, {"cbrecorder", {36, 60}}};
+    auto i = r.find(p); if (i == r.end()) return false; lo = i->second.first; hi = i->second.second; return true;
+  }
+  /* The octave shift that puts most of a line inside part's range, nearest its middle. */
+  static int fit_octave(const char* part, const std::vector<int>& ms) {
+    int lo, hi; if (ms.empty() || !range_of(part, lo, hi)) return 0;
+    int best = 0; double bs = 1e9;
+    for (int s = -48; s <= 48; s += 12) {
+      double out = 0, mid = 0; for (int m : ms) { int x = m + s; out += x < lo ? lo - x : x > hi ? x - hi : 0; mid += x; }
+      double sc = out * 10 + std::fabs(mid / ms.size() - (lo + hi) / 2.0); if (sc < bs) { bs = sc; best = s; }
+    }
+    return best;
+  }
   bool n(double t, double d, const char* part, int midi, float vel, float p1 = -1) {
     if (t < cut - 1e-6) return false;
+    { int lo, hi; if (range_of(part, lo, hi)) { while (midi < lo) midi += 12; while (midi > hi) midi -= 12; } }
     std::string ps(part); if (is_drum(ps)) vel *= drum_scale(t);
     vel = std::max(0.f, std::min(vel, 1.f)); if (vel < .01f) return false;
     Event e; e.t = t; e.d = d; e.part = ps; e.midi = midi; e.vel = vel; e.p1 = p1; eng.push(e);
@@ -194,20 +220,20 @@ struct Conductor::Impl {
   /* ---- melody */
   LeadPlan lead_plan(int b) const {
     float th = threat(b); int f = cur.lead_from;
+    const char* a = cur.lead; const char* d = cur.lead2;
+    auto two = [&](float va, int od, float vd) { std::vector<LeadVoice> v = {{a, 0, va}}; if (d) v.push_back({d, od, vd}); return v; };
     switch (cur.type) {
-      case kDawn: return {f, {{"fiddle", 0, 1}}, 0, .75f, 2, 6};
-      case kTravel: case kHerd:
-        if (cur.lead_alt & 1) return {f, {{"horn", 0, 1}, {"fiddle", 12, .5f}}, 0, .85f, 2, 6};
-        return {f, {{"fiddle", 0, 1}, {"horn", -12, .45f}}, 0, .85f, 2, 6};
-      case kMajesty: return {f, {{"fiddle", 0, 1}, {"horn", -12, .5f}}, 0, .9f, 3, 6};
-      case kStalk: if (th > .65f) return {0, {{"horn", 0, .9f}}, -1, .7f + .3f * th, 2, 5}; break;
-      case kStampede: return {f, {{"horn", 0, 1}, {"horn", -12, .75f}, {"fiddle", 12, .5f}}, 0, 1, 0, 1.5f};
-      case kAftermath: return {f, {{"fiddle", 0, .9f}, {"horn", -12, .4f}}, 0, .75f, 3, 5};
-      case kTribe: return {f, {{"horn", 0, .9f}, {"fiddle", -12, .5f}}, 0, .85f, 1, 3};
-      case kRest: return {f, {{"fiddle", 0, .7f}}, 0, .6f, 4, 8};
-      case kObserveScene: return {f, {{"fiddle", 0, .8f}}, 0, .7f, 4, 7};
-      case kFight: return {0, {{"horn", 0, 1}, {"fiddle", 12, .6f}}, 0, .95f, 0, 1.5f};
-      case kCoda: return {f, {{"fiddle", 0, .9f}, {"horn", -12, .55f}}, 0, .7f, 2, 4};
+      case kDawn: return {f, {{a, 0, 1}}, 0, .75f, 2, 6};
+      case kTravel: case kHerd: return {f, two(1, -12, .45f), 0, .85f, 2, 6};
+      case kMajesty: return {f, two(1, -12, .5f), 0, .9f, 3, 6};
+      case kStalk: if (th > .65f) return {0, {{a, 0, .9f}}, -1, .7f + .3f * th, 2, 5}; break;
+      case kStampede: return {f, {{a, 0, 1}, {"horn", -12, .75f}, {cur.top, 12, .5f}}, 0, 1, 0, 1.5f};
+      case kAftermath: return {f, two(.9f, -12, .4f), 0, .75f, 3, 5};
+      case kTribe: return {f, two(.9f, -12, .5f), 0, .85f, 1, 3};
+      case kRest: return {f, {{a, 0, .7f}}, 0, .6f, 4, 8};
+      case kObserveScene: return {f, {{a, 0, .8f}}, 0, .7f, 4, 7};
+      case kFight: return {0, {{a, 0, 1}, {cur.top, 12, .6f}}, 0, .95f, 0, 1.5f};
+      case kCoda: return {f, two(.9f, -12, .55f), 0, .7f, 2, 4};
       default: break;
     }
     return {1 << 20, {}, 0, 0, 0, 0};
@@ -242,11 +268,18 @@ struct Conductor::Impl {
       int sb = bar_at(lead_t), c = chord(sb), start = (c == -6 ? 0 : c) + 2 * I(3); while (start > 7) start -= 7;
       if (garden.last_whole()) start = 0;                     /* a whole real phrase sits in the key as written */
       double t = lead_t; int last = int(p.size()) - 1;
+      std::vector<int> ms;                                    /* the phrase's notes, so each voice can find its octave */
       for (int i = 0; i <= last; i++) {
         int bb = bar_at(t), m = deg(start + p[size_t(i)].deg, bb, L.octave);
         if (i == last && !chord_tone(bb, m)) { int best = m; for (int k = 1; k <= 3; k++) { if (chord_tone(bb, m - k)) { best = m - k; break; } if (chord_tone(bb, m + k)) { best = m + k; break; } } m = best; }
+        ms.push_back(m); t += p[size_t(i)].beats * B(b);
+      }
+      std::vector<int> shift; for (auto& v : L.voices) { std::vector<int> mv; for (int m : ms) mv.push_back(m + v.oct); shift.push_back(fit_octave(v.part, mv)); }
+      t = lead_t;
+      for (int i = 0; i <= last; i++) {
+        int m = ms[size_t(i)];
         double d = p[size_t(i)].beats * B(b) * .97;
-        bool any = false; for (auto& v : L.voices) any |= n(t, d, v.part, m + v.oct, L.vel * v.vm * float(U(.88, 1.0)));
+        bool any = false; for (size_t j = 0; j < L.voices.size(); j++) { auto& v = L.voices[j]; any |= n(t, d, v.part, m + v.oct + shift[j], L.vel * v.vm * float(U(.88, 1.0))); }
         if (any) { onsets.push_back(t); bar_lead++; }
         t += p[size_t(i)].beats * B(b);
       }
@@ -396,7 +429,7 @@ struct Conductor::Impl {
   }
   void pads(int b, float v, int bars = 2) {
     double d = chord_hold(b, bars) * .97;
-    for (int iv : cur.voicing) { int m = chord_note(b, iv, -1); if (m > -999) n(T(b), d, "horn", m, v * (.7f + .6f * N(kNMajesty))); }
+    for (int iv : cur.voicing) { int m = chord_note(b, iv, -1); if (m > -999) n(T(b), d, cur.pad, m, v * (.7f + .6f * N(kNMajesty)) * (strcmp(cur.pad, "horn") ? .8f : 1.f)); }
   }
   void braam(int b, float v) {
     double d = chord_hold(b, 3);
@@ -407,7 +440,19 @@ struct Conductor::Impl {
     int r = root(b, 0), L = int(cur.ost_iv.size()); double step = B(b) / 2;
     if ((b - cur.b0) % 4 == 3 && U() < .5) { int i = I(L); static const int pool[7] = {0, 7, 12, 10, 3, 5, -2}; cur.ost_iv[size_t(i)] = U() < .25 ? -99 : pool[I(7)]; }
     (void)r;
-    for (int k = 0; k < 8; k++) { int iv = cur.ost_iv[size_t(k % L)]; if (iv == -99) continue; int m = chord_note(b, iv, 0); if (m > -999) n(T(b) + k * step, .22, "mouthbow", m, v * cur.ost_v[size_t(k % L)]); }
+    for (int k = 0; k < 8; k++) { int iv = cur.ost_iv[size_t(k % L)]; if (iv == -99) continue; int m = chord_note(b, iv, 0); if (m > -999) n(T(b) + k * step, strcmp(cur.ost, "mouthbow") ? .6 : .22, cur.ost, m, v * cur.ost_v[size_t(k % L)] * (strcmp(cur.ost, "mouthbow") ? .85f : 1.f)); }
+  }
+  /* A plucked or struck arpeggio under the calm scenes: the chord's notes on the 8ths, in one of four rhythms. */
+  void pluck_bar(int b, float v) {
+    if (!cur.pluck) return;
+    static const int rh[4][8] = {{1, 0, 1, 0, 1, 0, 1, 0}, {1, 0, 0, 1, 0, 0, 1, 0}, {1, 1, 0, 1, 0, 1, 1, 0}, {1, 0, 0, 0, 1, 0, 1, 1}};
+    static const int up[8] = {0, 7, 12, 15, 19, 15, 12, 7};
+    double step = B(b) / 2; int j = 0;
+    for (int k = 0; k < 8; k++) {
+      if (!rh[cur.pluck_style][k]) continue;
+      int m = chord_note(b, up[j++ % 8], 1); if (m <= -999) continue;
+      n(T(b) + k * step, step * 3, cur.pluck, m, v * (k % 4 == 0 ? 1.f : .75f) * float(U(.85, 1.0)));
+    }
   }
   void stones(int b, float v) {
     double t = T(b) + I(4) * .5 * B(b);
@@ -444,6 +489,44 @@ struct Conductor::Impl {
     double r = U() * tot; for (auto& x : w) { r -= x.second; if (r <= 0) return x.first; }
     return w.back().first;
   }
+  /* Who plays this scene, from the voices that suit it; the lead is never the one the last scene had. */
+  void pick_voices(Inst& s) {
+    auto pick = [&](std::initializer_list<const char*> l, const char* avoid = nullptr) {
+      std::vector<const char*> v; for (auto* x : l) if (!avoid || !x || strcmp(x, avoid)) v.push_back(x);
+      return v[size_t(I(int(v.size())))];
+    };
+    const char* last = have_cur ? cur.lead : nullptr;
+    s.top = pick({"fiddle", "psaltery", "panpipes", "recorder"}); s.pad = "horn"; s.pluck = nullptr; s.ost = "mouthbow";
+    switch (s.type) {
+      case kDawn: case kTravel: case kHerd:
+        s.lead = pick({"fiddle", "ocarina", "recorder", "trecorder", "boneflute", "panpipes", "psaltery", "kalimba", "dantranh", "fiddle"}, last);
+        s.lead2 = pick({"horn", "horn", "fujara", "trecorder", "harmonium", nullptr});
+        s.ost = pick({"mouthbow", "mouthbow", "kalimba", "mbira", "balafon", "marimba", "folkharp", "dantranh"}, s.lead);
+        if (s.type == kDawn && U() < .6) s.pluck = pick({"folkharp", "kalimba", "mbira", "dantranh"}, s.lead);
+        break;
+      case kMajesty:
+        s.lead = pick({"fiddle", "fiddle", "psaltery", "choir", "fujara", "bugle", "recorder"}, last);
+        s.lead2 = pick({"horn", "horn", "choir", "harmonium"}, s.lead);
+        s.pad = pick({"horn", "horn", "choir", "harmonium"});
+        if (U() < .5) s.pluck = pick({"folkharp", "dantranh", "marimba"});
+        break;
+      case kAftermath: case kRest: case kObserveScene: case kCoda:
+        s.lead = pick({"ocarina", "glass", "fujara", "boneflute", "trecorder", "psaltery", "folkharp", "kalimba", "fiddle", "choir"}, last);
+        s.lead2 = pick({"horn", "harmonium", "bowedbone", nullptr, nullptr});
+        s.pad = pick({"horn", "harmonium", "psaltery", "choir"});
+        if (U() < .7) s.pluck = pick({"folkharp", "kalimba", "mbira", "dantranh", "marimba"}, s.lead);
+        break;
+      case kTribe:
+        s.lead = pick({"horn", "bugle", "panpipes", "balafon", "marimba", "mbira", "boneflute"}, last);
+        s.lead2 = pick({"fiddle", "horn", "bowedbone", "balafon", nullptr}, s.lead);
+        s.ost = pick({"mouthbow", "balafon", "marimba", "mbira"}, s.lead);
+        break;
+      case kStalk: s.lead = pick({"horn", "horn", "bowedbone", "fujara"}); s.lead2 = nullptr; break;
+      case kStampede: case kFight: s.lead = pick({"horn", "horn", "bugle"}); s.lead2 = "horn"; break;
+      default: s.lead = "fiddle"; s.lead2 = "horn"; break;
+    }
+    s.pluck_style = I(4);
+  }
   Inst make(int type, int key_from) {
     Inst s; s.type = type; const SceneDef& d = kDefs[type];
     s.e0 = d.e0; s.e1 = d.e1; s.th0 = d.th0; s.th1 = d.th1;
@@ -474,6 +557,7 @@ struct Conductor::Impl {
     static const int op[8] = {0, 0, 7, 12, 10, 3, 5, -99};
     for (int k = 0; k < ol; k++) { int iv = k == 0 ? 0 : op[I(8)]; s.ost_iv.push_back(iv); s.ost_v.push_back(k == 0 ? 1.f : float(U(.55, .85))); }
     s.ost_on = U() < .8;
+    pick_voices(s);
     return s;
   }
   void enter(int b) {
@@ -491,7 +575,8 @@ struct Conductor::Impl {
     garden.season(kDefs[cur.type].character, cur.serial);
     nxt = make(cur.type == kCoda || stopping ? kCoda : pick_next(cur.type), cur.key);
     static const char* kn[12] = {"C", "C#", "D", "Eb", "E", "F", "F#", "G", "G#", "A", "Bb", "B"};
-    char buf[96]; snprintf(buf, sizeof buf, "scene: %s (%d bars, key %s minor)", scene_name(cur.type), cur.b1 - cur.b0, kn[cur.key % 12]);
+    char buf[200]; snprintf(buf, sizeof buf, "scene: %s (%d bars, key %s minor; lead %s%s%s, ostinato %s, pads %s%s%s)", scene_name(cur.type), cur.b1 - cur.b0, kn[cur.key % 12],
+                            cur.lead, cur.lead2 ? " over " : "", cur.lead2 ? cur.lead2 : "", cur.ost, cur.pad, cur.pluck ? ", plucked " : "", cur.pluck ? cur.pluck : "");
     mark(std::max(T(b), cut), buf);
     if (built) {   /* the arrival, drawn fresh */
       double t = std::max(T(b), cut); n(t, 1.2, "bigdrum", 33, 1.0f);
@@ -533,6 +618,7 @@ struct Conductor::Impl {
         if (k >= 4 && U() < .25) call("ptero", t0 + I(4) * Bt, .45f, float(U(-.7, .7)), float(U(0, .4)), b);
         if (k > L / 2 && U() < .3) call("herd", t0 + I(4) * Bt, .5f, float(U(-.8, .8)), .75f, b);
         if (k >= cur.drums_from && k >= 6 && !breathe && dens > .3f && U() < .5) ostinato(b, .45f);
+        if (k >= 2 && !breathe) pluck_bar(b, .4f);
         break;
       case kTravel:
         if (k >= 1 && !breathe && dens > .2f) ostinato(b, .55f);
@@ -549,6 +635,7 @@ struct Conductor::Impl {
         if (k == cur.giant_bar) { call(animal_call(cur.animal), t0, 1.3f, float(U(-.3, .3)), 0, b); braam(b, .85f); if (U() < .6) call("boom", t0, 1.0f, 0, 0, b); }
         if (k == cur.giant2_bar) call(animal_call(cur.animal), t0 + I(3) * Bt, 1.15f, float(U(-.4, .4)), float(U(0, .3)), b);
         if (k >= cur.giant_bar && (k - cur.giant_bar) % 2 == 0 && left >= 2) pads(b, .3f);
+        if (k > cur.giant_bar && !breathe) pluck_bar(b, .35f);
         break;
       case kStalk:
         if (th > .4f && k % cur.hr == 0 && left >= cur.hr) n(t0, cur.hr * BR * .95, "horn", root(b, -1) + 12, .15f + .25f * th);
@@ -575,6 +662,7 @@ struct Conductor::Impl {
       case kAftermath:
         if (k >= 1 && U() < .6) stones(b, .4f);
         if (k == cur.giant_bar + 1) call(U() < .5 ? "sauropod" : "ptero", t0 + I(4) * Bt, .9f, float(U(-.6, .6)), .8f, b);
+        if (k >= 1 && !breathe) pluck_bar(b, .35f);
         break;
       case kTribe:
         if (k >= 2 && U() < .5) call("shout", t0 + U(0, 3.5) * Bt, .5f + .3f * e, float(U(-.7, .7)), float(U(0, .4)), b);
@@ -583,9 +671,11 @@ struct Conductor::Impl {
       case kRest:
         if (U() < .5) stones(b, .35f);
         if (U() < .3) call(animal_call(cur.animal), t0 + I(4) * Bt, .5f, float(U(-.7, .7)), .85f, b);
+        if (!breathe) pluck_bar(b, .3f);
         break;
       case kObserveScene:
         if (k % cur.hr == 0 && left >= cur.hr) pads(b, .22f, cur.hr);
+        if (!breathe && k % 2 == 1) pluck_bar(b, .3f);
         if (U() < .6) call(animal_call(cur.animal), t0 + (I(3) + 1) * Bt, .9f, float(U(-.5, .5)), float(U(0, .15)), b);
         break;
       case kShelterScene:
@@ -593,7 +683,7 @@ struct Conductor::Impl {
         if (U() < .4) call(animal_call(cur.animal), t0 + I(4) * Bt, .7f, float(U(-.8, .8)), .95f, b);
         break;
       case kCoda:
-        if (k == L - 3) { double dd = 3 * BR + 4; int r = key_at(b); for (int iv : cur.voicing) { int m = chord_note(b, iv, -1); if (m > -999) n(t0, dd, "horn", m, .6f); } (void)r; n(t0, dd, "fiddle", r + 7 * (U() < .5), .65f); }
+        if (k == L - 3) { double dd = 3 * BR + 4; int r = key_at(b); for (int iv : cur.voicing) { int m = chord_note(b, iv, -1); if (m > -999) n(t0, dd, "horn", m, .6f); } (void)r; n(t0, dd, cur.lead, r + 7 * (U() < .5), .65f); }
         if (k == L - 6 && U() < .7) call(U() < .5 ? "rex" : "sauropod", t0, 1.0f, float(U(-.6, .6)), .85f, b);
         if (k == L - 2) call("ptero", t0 + I(4) * Bt, .4f, float(U(-.6, .6)), .3f, b);
         break;
@@ -603,7 +693,7 @@ struct Conductor::Impl {
       interact_bars--;
       call(animal_call(cur.animal), t0, .9f, float(U(-.5, .5)), 0, b);
       motif::Line p = garden.phrase(kDefs[cur.type].character, 2, cur.serial); double tt = t0 + 2 * Bt; int st = 2 * I(3);
-      for (auto& q : p) { n(tt, q.beats * Bt * .95, "fiddle", deg(st + q.deg, b, 0), .75f); onsets.push_back(tt); tt += q.beats * Bt; }
+      for (auto& q : p) { n(tt, q.beats * Bt * .95, cur.lead, deg(st + q.deg, b, 0), .75f); onsets.push_back(tt); tt += q.beats * Bt; }
     }
     lead_bar(b, build_next);
     if (L >= 2 && cur.type != kCoda) lead_in(b, left, build_next);
@@ -642,8 +732,8 @@ struct Conductor::Impl {
         if (build_kind != kStopHit || U() < .5) {   /* the lead climbs into the new root, in a figure grown from the next scene's motifs */
           motif::Line up = garden.pickup(nch, true, 3 + I(5)); double len = 0; for (auto& q : up) len += q.beats;
           int top = up.back().deg, base = -top; double t = XT - len * Bt;
-          for (auto& q : up) { n(t, q.beats * Bt * .95, "fiddle", dmidi(nroot, base + q.deg), .5f + .3f * float((t - (XT - len * Bt)) / (len * Bt))); t += q.beats * Bt; }
-          n(XT, 2 * Bt, "fiddle", nroot, .85f); lead_t = std::max(lead_t, XT + 2 * Bt);
+          for (auto& q : up) { n(t, q.beats * Bt * .95, nxt.lead, dmidi(nroot, base + q.deg), .5f + .3f * float((t - (XT - len * Bt)) / (len * Bt))); t += q.beats * Bt; }
+          n(XT, 2 * Bt, nxt.lead, nroot, .85f); lead_t = std::max(lead_t, XT + 2 * Bt);
         }
       }
     } else if (left == 1) {
@@ -656,8 +746,8 @@ struct Conductor::Impl {
       if (U() < .7) {
         motif::Line dn = garden.pickup(nch, false, 2 + I(3)); double len = 0; for (auto& q : dn) len += q.beats;
         double t = XT - len * Bt; int top = -dn.back().deg;
-        for (auto& q : dn) { n(t, q.beats * Bt * .95, "fiddle", dmidi(nroot, top + q.deg), .55f); t += q.beats * Bt; }
-        n(XT, 3 * Bt, "fiddle", nroot, .6f); lead_t = std::max(lead_t, XT + 2.5 * Bt);
+        for (auto& q : dn) { n(t, q.beats * Bt * .95, nxt.lead, dmidi(nroot, top + q.deg), .55f); t += q.beats * Bt; }
+        n(XT, 3 * Bt, nxt.lead, nroot, .6f); lead_t = std::max(lead_t, XT + 2.5 * Bt);
       }
     }
   }

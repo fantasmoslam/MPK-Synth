@@ -8,6 +8,7 @@
 #include "../../paleo/third_party/miniaudio.h"
 #include "../../paleo/engine/paleo.h"
 #include "../../paleo/engine/conductor.h"
+#include "../../paleo/engine/sampler.h"
 #include "paleo_bridge.h"
 #include <atomic>
 #include <chrono>
@@ -120,6 +121,32 @@ void load_library(Bridge& b, const std::string& dir) {
   LOG("creature library: %d calls, %.1f MB", int(b.library.size()), frames * 4 / 1e6);
 }
 
+/* The recorded instruments (assets/samples: manifest.txt plus FLAC, from paleo/samples). They live in a library
+   shared by every engine, so they are read once per process and stay as 16-bit (about 19 MB). */
+void load_samples(const std::string& creature_dir) {
+  static bool done = false; if (done) return; done = true;
+  /* in the APK beside the creatures; on a desktop paleo/samples/lib beside paleo/creatures/lib */
+  std::string base = creature_dir.empty() || creature_dir == "creatures" ? std::string("samples") : creature_dir + "/../../samples/lib";
+  std::vector<char> text;
+  if (!read_file(base + "/manifest.txt", text)) { LOG("no recorded instruments"); return; }
+  std::istringstream m(std::string(text.begin(), text.end())); std::string line; int zones = 0;
+  while (std::getline(m, line)) {
+    if (line.empty() || line[0] == '#') continue;
+    std::istringstream ss(line); std::string kind, name; ss >> kind >> name;
+    if (kind == "inst") { float a = .01f, r = .3f; ss >> a >> r; paleo::add_sample_instrument(name, a, r); continue; }
+    if (kind != "zone") continue;
+    float root; int ls, le; std::string file; if (!(ss >> root >> ls >> le >> file)) continue;
+    std::vector<char> raw; if (!read_file(base + "/" + file, raw)) { LOG("can't read %s", file.c_str()); continue; }
+    ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 1, 0); ma_decoder d;
+    if (ma_decoder_init_memory(raw.data(), raw.size(), &cfg, &d) != MA_SUCCESS) { LOG("can't decode %s", file.c_str()); continue; }
+    std::vector<float> pcm; float buf[4096]; ma_uint64 got = 0;
+    while (ma_decoder_read_pcm_frames(&d, buf, 4096, &got) == MA_SUCCESS && got > 0) pcm.insert(pcm.end(), buf, buf + got);
+    int rate = int(d.outputSampleRate); ma_decoder_uninit(&d);
+    paleo::add_sample_zone(name, root, ls, le, pcm, rate); zones++;
+  }
+  LOG("recorded instruments: %d notes", zones);
+}
+
 /* ---- the worker: builds the engine, runs the conductor ---------------------------------- */
 void retire_engine(Bridge& b) {
   Engine* e = b.live.exchange(nullptr);
@@ -134,6 +161,7 @@ Engine* build_engine(Bridge& b, unsigned rate) {
   /* The calls move into the engine (about 43 MB as floats); a later rebuild reads the library again. */
   std::string dir; { std::lock_guard<std::mutex> l(b.m); dir = b.dir; }
   if (b.library.empty()) load_library(b, dir);
+  load_samples(dir);
   for (auto& c : b.library) e->add_creature(c.first, std::move(c.second));
   b.library.clear();
   return e;

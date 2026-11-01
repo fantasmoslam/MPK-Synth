@@ -89,7 +89,9 @@ int main(int argc, char** argv) {
     printf("seed %d: %.0f s, clash %.1f%%, tritone %.1f%%, busy %.1f%%, drum flams %.1f/min\n", s, end,
            100 * clash / std::max(1.0, sounding), 100 * tri / std::max(1.0, sounding), 100 * busy / std::max(1.0, sounding), flams / (end / 60));
     if (getenv("PARTS")) { std::map<std::string, int> cnt; for (auto& n : L.notes) if (n.vel > .1f) cnt[n.part]++;
-      printf("   notes per minute:"); for (auto& kv : cnt) printf(" %s %.0f", kv.first.c_str(), kv.second / (end / 60)); printf("\n"); }
+      printf("   notes per minute:"); for (auto& kv : cnt) printf(" %s %.0f", kv.first.c_str(), kv.second / (end / 60)); printf("\n");
+      std::map<std::string, std::pair<int, int>> rng; for (auto& n : L.notes) if (n.vel > .1f) { auto it = rng.find(n.part); if (it == rng.end()) rng[n.part] = {n.midi, n.midi}; else { it->second.first = std::min(it->second.first, n.midi); it->second.second = std::max(it->second.second, n.midi); } }
+      printf("   note range:"); for (auto& kv : rng) if (!drum(kv.first) && !unpitched(kv.first)) printf(" %s %d-%d", kv.first.c_str(), kv.second.first, kv.second.second); printf("\n"); }
     tot_t += sounding; tot_clash += clash; tot_tri += tri; tot_busy += busy; tot_flams += flams;
   }
   printf("all: clash %.1f%%, tritone %.1f%%, busy %.1f%%\n", 100 * tot_clash / tot_t, 100 * tot_tri / tot_t, 100 * tot_busy / tot_t);
