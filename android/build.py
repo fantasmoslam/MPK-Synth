@@ -107,6 +107,7 @@ def main():
     # PALEO's creature library (FLAC, read straight from the APK) and its credits.
     shutil.copytree(ROOT/"paleo/creatures/lib",OUT/"assets/creatures")
     shutil.copy(ROOT/"paleo/creatures/CREDITS.md",OUT/"assets/licenses/CREATURES.md")
+    shutil.copy(ROOT/"paleo/phrases/SOURCES.md",OUT/"assets/licenses/MUSIC.md")
     # The round-three interface fonts (SIL OFL 1.1; licences are in assets/licenses).
     (OUT/"assets/fonts").mkdir(parents=True,exist_ok=True)
     for name in INTERFACE_FONTS:shutil.copy(ROOT/"assets/fonts"/name,OUT/"assets/fonts"/name)

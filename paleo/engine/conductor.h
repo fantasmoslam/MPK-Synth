@@ -56,8 +56,6 @@ class Conductor {
   /* What the conductor did and when, for previews and the field journal. */
   struct Mark { double t; std::string text; };
   const std::vector<Mark>& marks() const;
-  /* For measuring: every drum bar ("D scene pattern") and every phrase ("M degree/beats ...") it writes. */
-  void set_trace(std::vector<std::string>* out);
   struct Impl; Impl* p;
 };
 }  // namespace paleo
