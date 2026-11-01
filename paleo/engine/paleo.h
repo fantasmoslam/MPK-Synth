@@ -22,7 +22,8 @@ std::vector<Event> read_score(const char* path);
 enum class Lead { horn, fiddle, choir, blend, all };   /* all: every lead part on, "lead" plays the fiddle (the live conductor names parts itself) */
 enum class Ostinato { spiccato, mouthbow, both };
 struct Options { int sample_rate = 48000; int threads = 0; /* 0 = all but one core */ Lead lead = Lead::fiddle;
-                 Ostinato ostinato = Ostinato::spiccato; };
+                 Ostinato ostinato = Ostinato::spiccato;
+                 void (*on_worker)() = nullptr;   /* called on each helper thread as it starts (e.g. to raise its priority) */ };
 
 class Engine {
  public:

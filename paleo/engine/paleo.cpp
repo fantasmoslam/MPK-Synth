@@ -112,15 +112,20 @@ struct Voice {
   bool active = false;
   long long start = 0, end = 0;      /* in frames */
   double dur = 0, pre = 0; float vel = 0; int midi = 0; int idx = 0; float ens_div = 1; float p1 = -1; int handle = 0;
+  int quiet = 0;                     /* frames in a row below kVoiceFloor after the note ended */
 };
+constexpr float kVoiceFloor = 3e-5f;   /* -90 dB: a ringing voice this quiet for kVoiceQuiet seconds has finished */
+constexpr double kVoiceQuiet = .1;
 struct Pending { long long start; int part; double dur, pre; float vel, freq; int midi, idx; float ens_div; float p1 = -1; int handle = 0; };
 
+constexpr long long kStripRest = 6;   /* seconds of silence after which a part's strip (EQ, Haas, echo) rests */
 struct Part {
   const PartDef* def; std::vector<Voice> v; std::vector<int> act; int notes = 0; bool on = true;
   Eq eq; Haas haas; PingPong pp; bool has_pp = false;
   float buf[kMaxBlock];
   double fade_t = 1e30, fade_tau = 1;  /* exponential fade from fade_t */
   bool tail = false; double tail_t = 1e30;
+  long long idle = 1LL << 40;          /* frames since the part last had a voice; its strip rests once its tail is gone */
 };
 struct Task { int part, from, to; float buf[kMaxBlock]; };
 
@@ -128,7 +133,8 @@ struct Task { int part, from, to; float buf[kMaxBlock]; };
 struct Pool {
   std::vector<std::thread> th; std::mutex m; std::condition_variable cv; long gen = 0; bool quit = false;
   std::atomic<int> next{0}, done{0}; int count = 0; std::function<void(int)> job;
-  void start(int n) { for (int i = 0; i < n; i++) th.emplace_back([this] { loop(); }); }
+  void (*on_start)() = nullptr;
+  void start(int n) { for (int i = 0; i < n; i++) th.emplace_back([this] { if (on_start) on_start(); loop(); }); }
   void loop() {
     flush_denormals(); long seen = 0;
     for (;;) {
@@ -147,11 +153,15 @@ struct Pool {
 };
 
 struct Reverb {
-  dsp* d = nullptr; Params p; float g = 1;
+  dsp* d = nullptr; Params p; float g = 1; long long quiet = 1LL << 40, hold = 0;
   void init(int sr, float rt60, float dark, float gain) {
     d = make_reverb(); d->init(sr); d->buildUserInterface(&p); Params::set(p.rt60, rt60); Params::set(p.dark, dark); g = gain;
+    hold = (long long)((2 * rt60 + 1) * sr);    /* silent in for this long: the tail is gone, so rest */
   }
   void run(float* inL, float* inR, float* outL, float* outR, int n) {
+    bool any = false; for (int i = 0; i < n && !any; i++) any = inL[i] != 0 || inR[i] != 0;
+    quiet = any ? 0 : quiet + n;
+    if (quiet > hold) { if (quiet - n <= hold) d->instanceClear(); memset(outL, 0, 4 * n); memset(outR, 0, 4 * n); return; }
     float* in[2] = {inL, inR}; float* out[2] = {outL, outR}; d->compute(n, in, out);
     for (int i = 0; i < n; i++) { outL[i] *= g; outR[i] *= g; }
   }
@@ -244,7 +254,7 @@ struct Engine::Impl {
     duckf.setup(float(sr), .002f, .18f, 48); gluef.setup(float(sr), .01f, .25f, 96);
     int n = o.threads > 0 ? o.threads - 1 : int(std::thread::hardware_concurrency()) - 1;
     pool.job = [this](int i) { run_task(i); };
-    pool.start(std::max(0, std::min(n, 15)));
+    pool.on_start = o.on_worker; pool.start(std::max(0, std::min(n, 15)));
   }
   /* Set each reverb's gain so white noise comes out at the power it went in, as the song's IRs did. */
   void calibrate() {
@@ -356,7 +366,7 @@ struct Engine::Impl {
     if (D.ctl == Ctl::horn) Params::set(v.p.p1, 3.3f);
     if (q.p1 >= 0) Params::set(v.p.p1, q.p1);   /* the score's own p1 (e.g. where a frame drum is hit) */
     v.active = true; v.start = q.start; v.dur = q.dur; v.pre = q.pre; v.vel = q.vel; v.midi = q.midi; v.idx = q.idx;
-    v.ens_div = q.ens_div; v.handle = q.handle; v.end = q.start + (long long)((q.dur + D.ring) * sr);
+    v.ens_div = q.ens_div; v.handle = q.handle; v.end = q.start + (long long)((q.dur + D.ring) * sr); v.quiet = 0;
     P.act.push_back(slot);
   }
 
@@ -399,7 +409,12 @@ struct Engine::Impl {
         if (ct + n <= v.start || ct >= v.end) continue;
         float og = control(D, v, double(ct - v.start) / sr);
         v.d->compute(n, nullptr, outs);
-        float g = og / v.ens_div; for (int k = 0; k < n; k++) T.buf[c + k] += tmp[k] * g;
+        float g = og / v.ens_div, pk = 0; for (int k = 0; k < n; k++) { float y = tmp[k] * g; T.buf[c + k] += y; pk = std::max(pk, std::fabs(y)); }
+        /* the ring is long enough for the slowest note; most die well before it, so stop rendering silence */
+        if (v.handle == 0 && ct >= v.start + (long long)((v.dur + .05) * sr)) {
+          v.quiet = pk < kVoiceFloor ? v.quiet + n : 0;
+          if (v.quiet > kVoiceQuiet * sr) { v.end = ct + n; break; }
+        }
       }
     }
   }
@@ -449,6 +464,7 @@ struct Engine::Impl {
     pool.run(ntasks);
     for (auto& P : parts) memset(P.buf, 0, sizeof(float) * n);
     for (int i = 0; i < ntasks; i++) { Part& P = parts[tasks[i].part]; for (int k = 0; k < n; k++) P.buf[k] += tasks[i].buf[k]; }
+    for (auto& P : parts) P.idle = P.act.empty() ? P.idle + n : 0;
     for (auto& P : parts) {   /* retire finished voices */
       for (int a = 0; a < int(P.act.size());) { Voice& v = P.v[P.act[a]]; if (t + n >= v.end) { v.active = false; P.act.erase(P.act.begin() + a); } else a++; }
     }
@@ -463,11 +479,13 @@ struct Engine::Impl {
     memset(hinL, 0, 4 * n); memset(hinR, 0, 4 * n); memset(rinL, 0, 4 * n); memset(rinR, 0, 4 * n);
     memset(tinL, 0, 4 * n); memset(tinR, 0, 4 * n); memset(L, 0, 4 * n); memset(R, 0, 4 * n);
     /* the drums' level drives the ducking of the drone, the ostinato and the leads */
-    static float duck[kMaxBlock]; Part& dr = parts[part_of("taiko")];
+    static float duck[kMaxBlock]; static const int p_taiko = part_of("taiko"), p_horn = part_of("horn"), p_braam = part_of("braam");
+    Part& dr = parts[p_taiko];
     for (int pi = 0; pi < kNumParts; pi++) {
       Part& P = parts[pi]; if (!P.on) continue; const Strip& s = P.def->s;
-      bool is_drum = pi == part_of("taiko"), is_lead = P.def->ctl == Ctl::lead || pi == part_of("horn");
-      bool is_braam = pi == part_of("braam");
+      bool is_drum = pi == p_taiko, is_lead = P.def->ctl == Ctl::lead || pi == p_horn;
+      if (P.idle > kStripRest * sr) { if (is_drum) for (int k = 0; k < n; k++) duck[k] = 1; continue; }   /* silent: nothing to do */
+      bool is_braam = pi == p_braam;
       for (int k = 0; k < n; k++) {
         float x = P.buf[k];
         if (s.pre > 0) x = tanhf(x * s.pre) / 0.76159416f;
@@ -536,7 +554,7 @@ struct Engine::Impl {
   }
   void reset_state() {
     t = 0; t_pub.store(0); cvoices.clear(); cpend_i = 0;
-    for (auto& P : parts) { for (auto& v : P.v) v.active = false; P.act.clear(); }
+    for (auto& P : parts) { for (auto& v : P.v) v.active = false; P.act.clear(); P.idle = 1LL << 40; }
     /* fresh effects so the pre-pass leaves nothing behind */
     for (auto& P : parts) {
       const Strip& s = P.def->s; P.eq.setup(float(sr), s.lo, s.hi, s.dipf, s.dipd, s.bf, s.bb);

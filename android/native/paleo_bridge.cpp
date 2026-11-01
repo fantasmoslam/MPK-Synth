@@ -22,6 +22,8 @@
 #include <thread>
 #include <utility>
 #include <vector>
+#include <sys/resource.h>
+#include <unistd.h>
 #ifdef __ANDROID__
 #include <android/asset_manager.h>
 #include <android/asset_manager_jni.h>
@@ -36,8 +38,19 @@ namespace {
 using paleo::Conductor;
 using paleo::Engine;
 
-/* Engine blocks are short so a note lands within a few ms; the callback's frames are split into these. */
+/* PALEO renders ahead of the audio callback on its own thread (with helpers on other cores), kChunk frames at a
+   time, keeping about kAheadSecs in a ring the callback copies from. The callback never waits for PALEO. */
 constexpr int kChunk = 256;
+constexpr unsigned kRing = 16384;            /* frames; a power of two */
+constexpr double kAheadSecs = .085;
+constexpr int kThreads = 4;                  /* the render thread and three helpers */
+
+void raise_priority() {
+#ifdef __ANDROID__
+  setpriority(PRIO_PROCESS, gettid(), -16);  /* Android's audio priority; ignored if refused */
+#endif
+}
+double now_s() { return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
 
 struct Bridge {
   /* ---- set from the UI thread */
@@ -46,25 +59,28 @@ struct Bridge {
   bool want_music = false, want_halt = false; int want_serial = 0, done_serial = 0;
   int notes[paleo::kNumNotes];
   std::vector<std::pair<int, int>> requests;      /* scene, urgency; or -1 - action */
-  std::thread worker; bool quit = false;
+  std::thread worker, renderer; bool quit = false; std::atomic<bool> quit_render{false};
 
   /* ---- owned by the worker */
   std::vector<std::pair<std::string, std::vector<float>>> library; bool library_loaded = false;
   std::unique_ptr<Conductor> conductor; uint32_t seed = 0;
 
-  /* ---- shared with the audio thread */
-  std::atomic<unsigned> want_rate{0};
-  std::atomic<Engine*> live{nullptr};             /* the engine the callback plays, or null */
-  std::atomic<int> in_mix{0};
+  /* ---- shared with the render thread and the audio callback */
+  std::atomic<unsigned> want_rate{0}, ahead{4096};
+  std::atomic<Engine*> live{nullptr};             /* the engine the render thread plays, or null */
+  std::atomic<int> in_render{0};
   std::atomic<int> state{0};
-  std::atomic<float> load{0};
+  std::atomic<float> load{0};                     /* the last chunk's render time over its length */
+  float ring[kRing * 2]; std::atomic<unsigned> rd{0}, wr{0};
+  std::atomic<unsigned> mixes{0}, short_mixes{0}, load_max_q{0}, load_sum_q{0}, load_n{0};
 
   /* ---- read by the UI, written by the worker under m */
   float gauges[paleo::kNumGauges]; std::string texts[paleo::kNumGauges]; int scene = -1;
   std::vector<std::string> recent;
 
   Bridge() { for (int& n : notes) n = 50; for (float& g : gauges) g = -1; }
-  ~Bridge() { { std::lock_guard<std::mutex> l(m); quit = true; } if (worker.joinable()) worker.join(); }
+  ~Bridge() { { std::lock_guard<std::mutex> l(m); quit = true; } if (worker.joinable()) worker.join();
+              quit_render = true; if (renderer.joinable()) renderer.join(); }
 };
 Bridge& B() { static Bridge b; return b; }
 
@@ -107,14 +123,13 @@ void load_library(Bridge& b, const std::string& dir) {
 /* ---- the worker: builds the engine, runs the conductor ---------------------------------- */
 void retire_engine(Bridge& b) {
   Engine* e = b.live.exchange(nullptr);
-  while (b.in_mix.load()) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  while (b.in_render.load()) std::this_thread::sleep_for(std::chrono::milliseconds(1));
   b.conductor.reset(); delete e;
 }
 Engine* build_engine(Bridge& b, unsigned rate) {
   paleo::Options o; o.sample_rate = int(rate); o.lead = paleo::Lead::all; o.ostinato = paleo::Ostinato::mouthbow;
-  /* One thread: the callback renders PALEO itself. Helper threads would run at normal priority and the
-     callback would wait on them; measure on the tablet before adding any. */
-  o.threads = 1;
+  o.threads = kThreads; o.on_worker = raise_priority;
+  b.ahead.store(std::min(kRing - 2 * kChunk, unsigned(kAheadSecs * rate / kChunk + 1) * kChunk));
   Engine* e = new Engine(o);
   /* The calls move into the engine (about 43 MB as floats); a later rebuild reads the library again. */
   std::string dir; { std::lock_guard<std::mutex> l(b.m); dir = b.dir; }
@@ -131,11 +146,41 @@ void publish(Bridge& b) {   /* under b.m */
   const auto& mk = b.conductor->marks(); b.recent.clear();
   for (size_t i = mk.size() > 8 ? mk.size() - 8 : 0; i < mk.size(); i++) b.recent.push_back(mk[i].text);
 }
+/* The render thread: keeps the ring about b.ahead frames ahead of the callback. */
+void render_loop(Bridge& b) {
+  raise_priority(); float L[kChunk], R[kChunk];
+  while (!b.quit_render.load()) {
+    b.in_render.store(1);
+    Engine* e = b.live.load();
+    unsigned w = b.wr.load(std::memory_order_relaxed), r = b.rd.load(std::memory_order_acquire);
+    if (!e || w - r + kChunk > b.ahead.load()) {
+      b.in_render.store(0); std::this_thread::sleep_for(std::chrono::microseconds(e ? 1000 : 5000)); continue;
+    }
+    double t0 = now_s(); e->render(L, R, kChunk); double used = (now_s() - t0) * b.want_rate.load() / kChunk;
+    b.in_render.store(0);
+    for (int i = 0; i < kChunk; i++) { unsigned k = (w + unsigned(i)) & (kRing - 1); b.ring[2 * k] = L[i]; b.ring[2 * k + 1] = R[i]; }
+    b.wr.store(w + kChunk, std::memory_order_release);
+    b.load.store(float(used)); unsigned q = unsigned(used * 1000);
+    b.load_sum_q.fetch_add(q); b.load_n.fetch_add(1); if (q > b.load_max_q.load()) b.load_max_q.store(q);
+  }
+}
+/* Every 10 s while the stream runs: adb logcat -s PaleotonePaleo */
+void report(Bridge& b, double& last, unsigned& last_mixes) {
+  double now = now_s(); if (now - last < 10) return; last = now;
+  unsigned m = b.mixes.load(); bool streaming = m != last_mixes; last_mixes = m;
+  unsigned n = b.load_n.exchange(0), sum = b.load_sum_q.exchange(0), mx = b.load_max_q.exchange(0), sh = b.short_mixes.exchange(0);
+  if (!streaming) return;
+  LOG("state %d | render %.0f%% avg, %.0f%% max of real time (%d threads) | callbacks short of PALEO audio: %u | ahead %u frames",
+      b.state.load(), n ? sum / 10.0 / n : 0.0, mx / 10.0, kThreads, sh, b.ahead.load());
+}
 void run(Bridge& b) {
   { std::string dir; { std::lock_guard<std::mutex> l(b.m); dir = b.dir; } load_library(b, dir); b.library_loaded = true; }
   /* decoded before the stream exists, so pressing Play needs no wait */
   unsigned rate = 0; std::mt19937 seeds(uint32_t(std::chrono::steady_clock::now().time_since_epoch().count()));
+  b.renderer = std::thread([&b] { render_loop(b); });
+  double last_report = now_s(); unsigned last_mixes = 0;
   for (;;) {
+    report(b, last_report, last_mixes);
     unsigned want = b.want_rate.load();
     if (want && want != rate) { retire_engine(b); b.live.store(build_engine(b, want)); rate = want; b.state = 0; LOG("engine ready at %u Hz", want); }
     Engine* e = b.live.load();
@@ -175,19 +220,12 @@ void paleo_library_assets(void* am) { Bridge& b = B(); std::lock_guard<std::mute
 void paleo_prepare(unsigned rate) { B().want_rate.store(rate); }
 
 void paleo_mix(float* out, unsigned frames, float gain) {
-  Bridge& b = B(); b.in_mix.store(1);
-  Engine* e = b.live.load();
-  if (e) {
-    float L[kChunk], R[kChunk]; double busy = 0;
-    for (unsigned done = 0; done < frames;) {
-      int n = int(std::min<unsigned>(kChunk, frames - done));
-      e->render(L, R, n); busy += e->last_load() * n;
-      float* o = out + 2 * done; for (int i = 0; i < n; i++) { o[2 * i] += L[i] * gain; o[2 * i + 1] += R[i] * gain; }
-      done += unsigned(n);
-    }
-    b.load.store(float(busy / frames));
-  }
-  b.in_mix.store(0);
+  Bridge& b = B(); b.mixes.fetch_add(1, std::memory_order_relaxed);
+  unsigned r = b.rd.load(std::memory_order_relaxed), w = b.wr.load(std::memory_order_acquire);
+  unsigned n = std::min(frames, w - r);
+  for (unsigned i = 0; i < n; i++) { unsigned k = (r + i) & (kRing - 1); out[2 * i] += b.ring[2 * k] * gain; out[2 * i + 1] += b.ring[2 * k + 1] * gain; }
+  b.rd.store(r + n, std::memory_order_release);
+  if (n < frames && b.live.load(std::memory_order_relaxed)) b.short_mixes.fetch_add(1, std::memory_order_relaxed);
 }
 
 void paleo_music(int on) {
