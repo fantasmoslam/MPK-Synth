@@ -35,3 +35,12 @@ void pt_display_control_read(unsigned slot, int *value, int *min, int *max, char
 }
 unsigned pt_display_playing(void) { return playing; }
 unsigned pt_display_scape_busy(void) { return scape_busy; }
+unsigned pt_display_voice(unsigned tr, char *engine, char *preset, pt_voice_param *params) {
+    return voice_read(tr, engine, preset, params);
+}
+unsigned pt_display_voice_names(unsigned tr, unsigned k, char names[][16], unsigned cap) {
+    return voice_names(tr, k, names, cap);
+}
+unsigned pt_display_control_names(unsigned slot, char names[][16], unsigned cap) {
+    return control_names(slot, names, cap);
+}

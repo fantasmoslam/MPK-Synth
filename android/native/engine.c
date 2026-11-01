@@ -91,6 +91,31 @@ void pt_control_set(unsigned slot,int value){
     ui.force=1;
 }
 
+void pt_voice_set(unsigned tr,unsigned k,int value){
+    track_t *t=&trk[tr%NTRK];unsigned id=P_E0+(k&7u);const param_desc_t *d=track_desc(t,id);
+    if(d->max>d->min)t->p[id]=(int16_t)enum_orig(d,clamp(value,d->min,d->max));
+    (void)motion_capture(t,id,t->p[id]);ui.force=1;
+}
+void pt_voice_engine(unsigned tr,unsigned engine){
+    if(!eng_ok(engine)||engine==ENGI_SLICE)return;
+    set_engine_of(&trk[tr%NTRK],engine);ui.force=1;
+}
+void pt_voice_preset(unsigned tr,unsigned preset){
+    track_t *t=&trk[tr%NTRK];const engine_t *e=ENGINES[eng_idx(t->eng_req)];
+    if(preset<e->npresets){apply_preset_to(t,preset);ui.force=1;}
+}
+unsigned pt_engine_list(unsigned *out,unsigned cap){
+    unsigned n=0;for(unsigned i=0;i<NENG_SHOWN&&n<cap;++i){unsigned e=eng_vis(i);if(eng_ok(e)&&e!=ENGI_SLICE)out[n++]=e;}return n;
+}
+const char *pt_engine_name(unsigned engine){return engine<NENGINES?ENGINES[engine]->name:"";}
+unsigned pt_preset_list(unsigned engine,unsigned *out,unsigned cap){
+    if(engine>=NENGINES)return 0;const engine_t *e=ENGINES[engine];unsigned n=0;
+    for(unsigned k=0;k<e->npresets&&n<cap;++k)if(!preset_hidden(e,k))out[n++]=k;return n;
+}
+const char *pt_preset_name(unsigned engine,unsigned preset){
+    return engine<NENGINES&&preset<ENGINES[engine]->npresets?ENGINES[engine]->presets[preset].name:"";
+}
+
 /* Android performance actions. A switch has an audible action, not merely an
  * evolution flag. Pattern composition remains a separate confirmed action. */
 static int scape_last_environment=80,scape_last_drone=40;

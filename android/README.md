@@ -10,33 +10,41 @@ The APK carries native libraries for both `armeabi-v7a` (the SM-T510's 32-bit us
 `arm64-v8a` (64-bit tablets such as the Galaxy Tab S6 Lite SM-P610 on official LineageOS 23.2).
 The 64-bit build has not yet been accepted on a device.
 
-## Round-three interface (0.4.0, phase 1)
+## Round-three interface (0.4.0, phases 1 and 2)
 
-The signed-off round-three design (Focus by default, Performance switchable) replaces
-the four-tab workspace. `java/org/paleotone/synth/ui/` holds the screens and controls as
-plain Java drawing through `Gfx`, so the same code runs on the tablet (`PhosphorView`,
-Android Canvas) and on a desktop JDK for review screenshots:
+The signed-off round-three design (Focus by default, Performance switchable) is the whole
+app; the old firmware panel and four-tab workspace are gone. `java/org/paleotone/synth/ui/`
+holds the screens and controls as plain Java drawing through `Gfx`, so the same code runs on
+the tablet (`PhosphorView`, Android Canvas) and on a desktop JDK for review screenshots:
 
 ```sh
 sh android/preview/render.sh build/preview
 ```
 
-Phase 1 delivers the header, navigation rail and Performance dock, the fixed bottom bar
-(environment, music, Stop All, save), INSTRUMENT in both layouts with the eight notes to
-the conductor, Hold/Next, Biome, Music mood and Live balance, and Settings. Knobs follow the
-review's zero rule: unipolar knobs sweep from 7 o'clock to 5 o'clock; only engine-marked
-bipolar parameters point to 12 at zero, with a centre tick. Until later phases:
+- **Shell:** header, navigation rail and Performance dock, the fixed bottom bar (environment,
+  music, Stop All, save, Quick mix), choice sheets (paged when long) and notices.
+- **INSTRUMENT:** the eight notes to the conductor, Hold/Next, Biome, Music mood, Live balance.
+- **Mixer → Parts:** per part voice (opens Sound design), level, mute, pan (drag sideways; tap
+  for centre) and role; Output with Environment, Master and Tempo.
+- **Mixer → Habitat layers:** eight layer levels with mute, and the environment drone. The engine
+  has no layer mute, so mute sets the level to 0 and the interface remembers the old level.
+- **Sound design:** part, voice (engine) and preset, and the voice's eight edit parameters with the
+  firmware's own descriptors, ranges and wording (`Native.voice`). List parameters open a sheet;
+  the rest are knobs. Blank parameter slots are shown empty.
+- **Quick mix:** part levels, mutes and pans over any screen.
+- **Library:** imported WAV sound files with waveform, Load, Preview, root note and Delete, and the
+  playing source (imported sample or Paleotone sounds) for keyboard and MIDI. Preview plays the root
+  note through the sample layer for up to four seconds.
 
-- The notes are saved with the interface state but not yet connected; their gauges show a dash.
-- Mixer and Library show the existing pages inside the new frame; Sound design opens the
-  firmware panel, which is also under Settings → Legacy panel.
-- Recording, run length, the expedition screens, map, journal, bestiary and Start are not built yet.
-- The run clock counts time with audio running; it is not yet the run timer.
+Knobs follow the review's zero rule: unipolar knobs sweep from 7 o'clock to 5 o'clock; only
+engine-marked bipolar parameters point to 12 at zero, with a centre tick. Not built yet: the
+notes are saved but not connected (their gauges show a dash); recording and the run timer
+(phase 3); the expedition, map, journal, bestiary and Start screens (phase 5).
 
 Fonts (SIL OFL 1.1, licences in the APK's `assets/licenses`): Michroma, IBM Plex Mono,
 Caveat and IM FELL English. `android/tests/UiTest.java` checks the knob zero rule, both
 layouts on every screen at 1280 and 1333 units wide, dragging, layout switching, Stop All
-over sheets and the dock.
+over sheets and quick mix, the dock, sound design edits and layer mutes.
 
 ## Source baseline and scope
 
@@ -124,9 +132,9 @@ Supported: RIFF WAV PCM 8/16/24/32-bit or float32, mono/stereo, 8–192 kHz, up 
 values are zeroed. One decoded sample is shared by eight voices with linear pitch
 conversion, a short attack/release and an end fade. Loading briefly pauses audio;
 copying/decoding runs on a worker. No sample allocation or disk I/O occurs inside
-the callback. The panel master slider and accepted output limiter also apply to
-sample audio. Sample keyboard notes are F3–G5; its octave buttons still belong to
-the firmware panel. MIDI note-on/off and all-notes-off are supported in sample mode;
+the callback. Master and the accepted output limiter also apply to
+sample audio. Since 0.4.0 there is no on-screen keyboard: the sample layer is played from
+MIDI, and from Preview in Library. MIDI note-on/off and all-notes-off are supported in sample mode;
 sustain pedal and other expression controls are not implemented for this layer.
 
 **Imported samples are a separate playable layer, not new firmware track presets.**

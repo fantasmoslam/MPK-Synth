@@ -30,3 +30,47 @@ static void control_read(unsigned slot,int *value,int *min,int *max,char *text){
     fmt_named=before;
     snprintf(text,64,"%s%s%s",formatted,unit&&*unit?" ":"",unit?unit:"");
 }
+
+/* Every value's text of a control with a short range (role, biome, mood), in order from min. */
+static unsigned control_names(unsigned slot,char names[][16],unsigned cap){
+    if(slot>=PT_CONTROL_COUNT)return 0;
+    const pt_control *c=&controls[slot];const param_desc_t *d=c->track<0?&GP[c->id]:&TP[c->id];
+    if(d->max-d->min>=(int)cap)return 0;
+    unsigned n=0;
+    for(int v=d->min;v<=d->max;++v,++n){
+        uint8_t before=fmt_named;char formatted[64];const char *unit=0;param_format(d,v,formatted,&unit);fmt_named=before;
+        snprintf(names[n],16,"%s%s%s",formatted,unit&&*unit?" ":"",unit?unit:"");
+    }
+    return n;
+}
+
+/* Sound design (round-three interface). A part's voice as the firmware's own editor
+ * sees it: the effective descriptor of each of the engine's eight EDIT parameters
+ * (track_desc applies the engine's mode-dependent labels and value names), its value
+ * and the firmware's formatted text. Read by the display copy from snapshots. */
+#include "voice.h"
+static unsigned voice_read(unsigned tr,char *engine,char *preset,pt_voice_param *out){
+    const track_t *t=&trk[tr%NTRK];unsigned ei=eng_idx(t->eng_req);const engine_t *e=ENGINES[ei];
+    snprintf(engine,16,"%s",e->name);
+    snprintf(preset,24,"%s",t->user?"USER":e->npresets&&t->preset<e->npresets?e->presets[t->preset].name:"");
+    for(unsigned k=0;k<8;++k){
+        const param_desc_t *d=track_desc(t,P_E0+k);pt_voice_param *p=&out[k];
+        snprintf(p->label,sizeof p->label,"%s",d->label?d->label:"");
+        p->fmt=d->fmt;p->min=d->min;p->max=d->max;p->value=t->p[P_E0+k];
+        p->bipolar=d->fmt==F_BIPCT||d->fmt==F_SEMI||d->min<0;
+        uint8_t before=fmt_named;char formatted[64];const char *unit=0;param_format(d,p->value,formatted,&unit);fmt_named=before;
+        snprintf(p->text,sizeof p->text,"%s%s%s",formatted,unit&&*unit?" ":"",unit?unit:"");
+    }
+    return ei;
+}
+/* The value names of an F_ENUM edit parameter (count returned; 0 if not a list). */
+static unsigned voice_names(unsigned tr,unsigned k,char names[][16],unsigned cap){
+    const track_t *t=&trk[tr%NTRK];const param_desc_t *d=track_desc(t,P_E0+(k&7u));
+    if(d->fmt!=F_ENUM)return 0;
+    unsigned n=0;
+    for(int v=d->min;v<=d->max&&n<cap;++v,++n){
+        uint8_t before=fmt_named;char formatted[64];const char *unit=0;param_format(d,v,formatted,&unit);fmt_named=before;
+        snprintf(names[n],16,"%s",formatted);
+    }
+    return n;
+}

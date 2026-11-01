@@ -59,16 +59,58 @@ public final class Preview {
     /** Fixed example values matching the round-three boards. */
     static final class ExampleEngine implements Engine {
         final int[] v=new int[48];
-        ExampleEngine(){v[TEMPO]=72;v[HABITAT]=60;v[DRONE]=40;v[EVOLVING]=1;v[HOLD]=1;v[BIOME]=1;v[MOOD]=0;}
+        static final String[] ROLES={"Bed","Melody","Bass","Pulse","Free"};
+        ExampleEngine(){
+            v[TEMPO]=72;v[HABITAT]=60;v[DRONE]=30;v[EVOLVING]=1;v[HOLD]=1;v[BIOME]=1;v[MOOD]=0;
+            int[] levels={58,44,62,34};for(int i=0;i<4;i++){v[LEVEL+i]=levels[i];v[ROLE+i]=i;}
+            v[MUTE+3]=1;v[PAN+1]=12;
+            int[] layers={32,25,0,5,12,18,8,6};for(int i=0;i<8;i++)v[LAYER+i]=layers[i];
+        }
         public int value(int slot){return v[slot];}
-        public int min(int slot){return 0;}
-        public int max(int slot){return slot==BIOME?7:slot==MOOD?5:slot==TEMPO?240:100;}
+        public int min(int slot){return slot>=PAN&&slot<PAN+4?-31:0;}
+        public int max(int slot){return slot==BIOME?7:slot==MOOD?5:slot==TEMPO?240:slot>=ROLE&&slot<ROLE+4?4:slot>=MUTE&&slot<MUTE+4?1:slot>=PAN&&slot<PAN+4?31:100;}
         public String text(int slot){
             if(slot==TEMPO)return v[slot]+" BPM";
             if(slot==BIOME)return Screens.BIOMES[v[slot]];
             if(slot==MOOD)return Screens.MOODS[v[slot]];
+            if(slot>=ROLE&&slot<ROLE+4)return ROLES[v[slot]];
+            if(slot>=PAN&&slot<PAN+4)return v[slot]==0?"C":Math.abs(v[slot])+(v[slot]<0?" L":" R");
             return Integer.toString(v[slot]);
         }
+        public String[] names(int slot){
+            if(slot==BIOME)return Screens.BIOMES;if(slot==MOOD)return Screens.MOODS;
+            if(slot>=ROLE&&slot<ROLE+4)return ROLES;return new String[0];
+        }
+        public Voice voice(int part){
+            return new Voice(0,"Analog",new String[]{"Warm bed","Air / flute","Low / round","Soft pulse"}[part],new Param[]{
+                new Param("WAVE",true,0,6,1,false,"SAW"),new Param("DTN",false,0,127,10,false,"10 ct"),
+                new Param("MIX",false,0,127,64,false,"50%"),new Param("NOIS",false,0,127,0,false,"0%"),
+                new Param("CUT",false,0,127,90,false,"1.2 kHz"),new Param("RES",false,0,127,30,false,"24%"),
+                new Param("DRV",false,0,127,0,false,"0%"),new Param("KTR",false,-64,63,0,true,"0%")});
+        }
+        public String[] valueNames(int part,int param){return new String[]{"SINE","SAW","SQUARE","TRI","PULSE","SUPER","NOISE"};}
+        public void setParam(int part,int param,int value){}
+        public Choice[] engines(){String[] n={"Analog","Saurus","Phase","Lofi","Sample","Voice","Trio","Wheel","Grain","Phys","Drum","Noise","FM6","Roar"};
+            Choice[] c=new Choice[n.length];for(int i=0;i<n.length;i++)c[i]=new Choice(i,n[i]);return c;}
+        public Choice[] presets(int engine){return new Choice[]{new Choice(0,"Warm bed"),new Choice(1,"Glass"),new Choice(2,"Reed")};}
+        public void setEngine(int part,int engine){}
+        public void setPreset(int part,int preset){}
+        final Library library=new Library(){
+            float[] wave(int seed){float[] p=new float[120];java.util.Random r=new java.util.Random(seed);for(int i=0;i<p.length;i++)p[i]=.35f+.6f*r.nextFloat();return p;}
+            final Sound[] list={new Sound("a","Flute C4.wav",60,1.2f,wave(1)),new Sound("b","Jungle C3.wav",48,8f,wave(2)),
+                new Sound("c","Riverbank study.wav",48,8f,wave(3)),new Sound("d","Lowland calls.wav",48,8f,wave(4))};
+            public Sound[] sounds(){return list;}
+            public String loaded(){return "c";}
+            public boolean sampleSource(){return true;}
+            public void useSample(boolean on){}
+            public void load(String id){}
+            public void preview(String id){}
+            public void setRoot(String id,int note){}
+            public void delete(String id){}
+            public void importWav(){}
+            public String status(){return null;}
+        };
+        public Library library(){return library;}
         public void set(int slot,int value){v[slot]=value;}
         public boolean scape(int command){return true;}
         public boolean audioOn(){return true;}
@@ -85,14 +127,26 @@ public final class Preview {
         String[][] shots={
             {"focus-instrument","FOCUS","INSTRUMENT"},{"performance-instrument","PERFORMANCE","INSTRUMENT"},
             {"focus-settings","FOCUS","SETTINGS"},{"performance-expedition","PERFORMANCE","EXPEDITION"},
-            {"focus-instrument-biome-sheet","FOCUS","INSTRUMENT"}};
+            {"focus-instrument-biome-sheet","FOCUS","INSTRUMENT"},
+            {"focus-mixer","FOCUS","MIXER"},{"performance-mixer","PERFORMANCE","MIXER"},
+            {"focus-mixer-layers","FOCUS","MIXER"},{"performance-mixer-layers","PERFORMANCE","MIXER"},
+            {"focus-sounddesign","FOCUS","SOUND_DESIGN"},{"performance-sounddesign","PERFORMANCE","SOUND_DESIGN"},
+            {"focus-sounddesign-voice-sheet","FOCUS","SOUND_DESIGN"},
+            {"focus-quickmix","FOCUS","INSTRUMENT"},{"performance-quickmix","PERFORMANCE","MIXER"},
+            {"focus-library","FOCUS","LIBRARY"},{"performance-library","PERFORMANCE","LIBRARY"},
+            {"focus-library-recordings","FOCUS","LIBRARY"}};
         for(String[] shot:shots)for(int width:new int[]{1920,2000}){
             float scale=1.5f;BufferedImage img=new BufferedImage(width,1200,BufferedImage.TYPE_INT_RGB);
             Graphics2D g=img.createGraphics();g.scale(scale,scale);
             UiState state=new UiState();state.layout=UiState.Layout.valueOf(shot[1]);state.screen=UiState.Screen.valueOf(shot[2]);
             state.runElapsed=8*60000+42000;state.runLength=30*60000;
-            Engine engine=new ExampleEngine();Ui ui=new Ui();Screens screens=new Screens(ui,state,engine);
-            if(shot[0].endsWith("sheet"))screens.choose("Biome",Screens.BIOMES,1,v->{});
+            ExampleEngine engine=new ExampleEngine();Ui ui=new Ui();Screens screens=new Screens(ui,state,engine);
+            if(shot[0].contains("layers"))state.mixerPage=1;
+            if(shot[0].contains("quickmix"))state.quickMix=true;
+            if(shot[0].contains("recordings"))state.libraryTab=1;
+            if(shot[0].equals("focus-library")||shot[0].equals("performance-library"))state.librarySelected="c";
+            if(shot[0].endsWith("biome-sheet"))screens.choose("Biome",Screens.BIOMES,1,v->{});
+            if(shot[0].endsWith("voice-sheet")){Engine.Choice[] c=engine.engines();String[] n=new String[c.length];for(int i=0;i<n.length;i++)n[i]=c[i].name;screens.choose("Voice for part 1",n,0,v->{});}
             ui.begin(new Java2dGfx(g,fonts),width/scale,1200/scale,0);screens.draw();ui.end();
             g.dispose();
             ImageIO.write(img,"png",new File(out,shot[0]+(width==2000?"-2000":"")+".png"));

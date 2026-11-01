@@ -9,7 +9,7 @@ public final class UiState {
     public enum Layout{FOCUS,PERFORMANCE}
     public enum Screen{
         EXPEDITION("Expedition"),INSTRUMENT("INSTRUMENT"),MIXER("Mixer"),LIBRARY("Library"),
-        JOURNAL("Journal"),BESTIARY("Bestiary"),START("Start"),SETTINGS("Settings"),LEGACY("Legacy panel");
+        JOURNAL("Journal"),BESTIARY("Bestiary"),START("Start"),SETTINGS("Settings"),SOUND_DESIGN("INSTRUMENT");
         public final String label;
         Screen(String label){this.label=label;}
     }
@@ -24,8 +24,20 @@ public final class UiState {
 
     public Layout layout=Layout.FOCUS;
     public Screen screen=Screen.INSTRUMENT;
-    /** Mixer sub-page: 0 tracks, 1 Scape layers. */
+    /** Mixer sub-page: 0 parts, 1 habitat layers. */
     public int mixerPage;
+    /** The part sound design edits, 0..3. */
+    public int designPart;
+    /** Quick mix open over the current screen. */
+    public boolean quickMix;
+    /** Library: the selected sound's id, and the tab (0 sound files, 1 recordings). */
+    public String librarySelected;
+    public int libraryTab,libraryPage;
+    /**
+     * Habitat layer mutes. The engine has no layer mute, so muting sets the level to 0
+     * and remembers it here; -1 means not muted.
+     */
+    public final int[] layerMuted={-1,-1,-1,-1,-1,-1,-1,-1};
     /** Your requests, 0..100. */
     public final int[] notes={34,62,52,38,60,18,44,55};
     /** The conductor's response, 0..1, or NaN while nothing answers it. */
@@ -43,14 +55,20 @@ public final class UiState {
     public String save(){
         StringBuilder b=new StringBuilder();b.append(layout.name()).append(';').append(screen.name());
         for(int n:notes)b.append(';').append(n);
+        for(int n:layerMuted)b.append(';').append(n);
+        b.append(';').append(designPart).append(';').append(mixerPage);
         return b.toString();
     }
     public void load(String saved){
         if(saved==null)return;
         try{
             String[] p=saved.split(";");
-            layout=Layout.valueOf(p[0]);screen=Screen.valueOf(p[1]);
+            layout=Layout.valueOf(p[0]);
             for(int i=0;i<8&&i+2<p.length;i++)notes[i]=Math.max(0,Math.min(100,Integer.parseInt(p[i+2])));
+            for(int i=0;i<8&&i+10<p.length;i++)layerMuted[i]=Math.max(-1,Math.min(100,Integer.parseInt(p[i+10])));
+            if(p.length>18)designPart=Math.max(0,Math.min(3,Integer.parseInt(p[18])));
+            if(p.length>19)mixerPage=Math.max(0,Math.min(1,Integer.parseInt(p[19])));
+            screen=Screen.valueOf(p[1]); // last: screens from older versions (the legacy panel) fall back to INSTRUMENT
         }catch(RuntimeException ignored){}
     }
 }

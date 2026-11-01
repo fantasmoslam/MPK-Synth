@@ -141,3 +141,22 @@ Tablet checks:
    return. Check the loaded sample and original keys still play after restarting.
 6. Confirm all three panels, named selectors, large sliders, mixer, kiosk exit,
    session restore and headphone recovery on the SM-T510.
+
+## 0.4.0-alpha round-three interface — pending hardware acceptance
+
+The old firmware panel, its on-screen keyboard and the four-tab workspace are removed.
+Check on the SM-T510 (and the Tab S6 Lite when available), in Focus and Performance:
+
+1. Header, rail or dock and bottom bar fit; Stop All works from every screen, over a choice
+   sheet and over Quick mix. Holding the PALEOTONE title for three seconds opens maintenance.
+2. INSTRUMENT: notes knobs drag with one finger each; Biome and Music mood change the sound;
+   Hold and Next behave as before.
+3. Mixer → Parts: level, mute, pan (drag sideways, tap for centre) and role act on the right
+   part only; Tempo drags; Environment and Master match Live balance.
+4. Mixer → Habitat layers: each level moves its layer; Mute silences it and restores the old
+   level; Drone toggles and its level moves.
+5. Sound design: change part, voice and preset; turn each knob; open a list parameter and pick a
+   value; confirm the sound changes and the displayed values match what you hear. Save session,
+   restart, and confirm the edits are kept.
+6. Library: Preview each starter, import a WAV, change its root note, Load it, switch the playing
+   source and play it from a MIDI controller; Delete it.

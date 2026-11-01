@@ -36,6 +36,17 @@ public final class UiTest {
         public void stopAll(){stopped=true;}
         public void saveSession(){}
         public void action(String name){}
+        public String[] names(int s){return new String[]{"Bed","Melody","Bass","Pulse"};}
+        public Voice voice(int part){Param[] p=new Param[8];for(int k=0;k<8;k++)p[k]=new Param(k==7?"-":"P"+k,k==0,0,k==1?127:6,v[40+k%8],k==2,"x");return new Voice(0,"Analog","Warm",p);}
+        public String[] valueNames(int part,int param){return new String[]{"A","B","C"};}
+        int lastParam=-1,lastParamValue;
+        public void setParam(int part,int param,int value){lastParam=param;lastParamValue=value;}
+        public Choice[] engines(){return new Choice[]{new Choice(0,"Analog"),new Choice(2,"Phase")};}
+        public Choice[] presets(int engine){return new Choice[]{new Choice(0,"Warm")};}
+        int engineSet=-1;
+        public void setEngine(int part,int engine){engineSet=engine;}
+        public void setPreset(int part,int preset){}
+        public Library library(){return null;}
     }
 
     static float pointerDegrees(RecordingGfx g){
@@ -91,9 +102,37 @@ public final class UiTest {
         ui.down(3,1263-20,660);ui.up(3,1263-20,660);
         if(state.screen!=UiState.Screen.SETTINGS)throw new AssertionError("last dock button (Settings) is reachable above the bar");
 
+        // Sound design: every voice change goes through the sheet to the engine.
+        state.layout=UiState.Layout.FOCUS;state.screen=UiState.Screen.SOUND_DESIGN;
+        RecordingGfx dg=new RecordingGfx();ui.begin(dg,1280,800,40);screens.draw();ui.end();
+        if(!dg.texts.contains("P1")||dg.texts.contains("-"))throw new AssertionError("sound design shows used parameters and hides blank ones");
+        float cw=(1280-17-140-13*3)/4f,ch=(591-98-13)/2f;
+        float px=140+cw+cw/2,py=94+98+ch*.635f;  // second card's knob
+        ui.down(4,px,py);ui.move(4,px,py-60);ui.up(4,px,py-60);
+        if(engine.lastParam!=1||engine.lastParamValue<=0)throw new AssertionError("dragging a parameter knob sets it: "+engine.lastParam);
+        // Habitat layer mute remembers the level and restores it.
+        state.screen=UiState.Screen.MIXER;state.mixerPage=1;engine.v[Engine.LAYER+2]=40;
+        ui.begin(new RecordingGfx(),1280,800,50);screens.draw();ui.end();
+        float lcw=(1123-26-30)/4f,lx=140+13+2*(lcw+10)+lcw-75+32,ly=94+65+43+9+23;
+        ui.down(5,lx,ly);ui.up(5,lx,ly);
+        if(engine.v[Engine.LAYER+2]!=0||state.layerMuted[2]!=40)throw new AssertionError("layer mute sets 0 and remembers the level");
+        ui.begin(new RecordingGfx(),1280,800,60);screens.draw();ui.end();ui.down(5,lx,ly);ui.up(5,lx,ly);
+        if(engine.v[Engine.LAYER+2]!=40||state.layerMuted[2]!=-1)throw new AssertionError("unmute restores the level");
+        // Quick mix opens over any screen and keeps Stop All live.
+        state.screen=UiState.Screen.INSTRUMENT;state.quickMix=true;engine.stopped=false;
+        RecordingGfx qg=new RecordingGfx();ui.begin(qg,1280,800,70);screens.draw();ui.end();
+        if(!qg.texts.contains("QUICK MIX"))throw new AssertionError("quick mix drawn");
+        ui.down(6,323+64,723+23);ui.up(6,323+64,723+23);
+        if(!engine.stopped)throw new AssertionError("Stop All works under quick mix");
+        state.quickMix=false;
+
         // Saved state round trip.
         UiState copy=new UiState();copy.load(state.save());
         if(copy.notes[0]!=dragged||copy.layout!=state.layout)throw new AssertionError("UI state round trip");
-        System.out.println("PASS: interface rules (knob zero, layouts, dragging, Stop All over sheets, dock, saved state)");
+        state.layerMuted[5]=22;state.designPart=2;copy=new UiState();copy.load(state.save());
+        if(copy.layerMuted[5]!=22||copy.designPart!=2)throw new AssertionError("layer mutes and part survive saving");
+        copy=new UiState();copy.load("FOCUS;LEGACY;1;2;3;4;5;6;7;8");
+        if(copy.screen!=UiState.Screen.INSTRUMENT||copy.notes[7]!=8)throw new AssertionError("a saved legacy screen falls back to INSTRUMENT");
+        System.out.println("PASS: interface rules (knob zero, layouts, dragging, Stop All over sheets and quick mix, dock, sound design, layer mutes, saved state)");
     }
 }

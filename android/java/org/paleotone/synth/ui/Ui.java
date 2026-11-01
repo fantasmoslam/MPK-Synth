@@ -110,6 +110,43 @@ public final class Ui {
     }
 
     /**
+     * A value tile you drag sideways to change (pan, tempo, root note). A tap without
+     * dragging runs tap, if given (pan returns to centre).
+     */
+    public void dragTile(final String id,float x,float y,float w,float h,String caption,String text,
+                         float value,final float min,final float max,final float unitsPerStep,final IntConsumer set,final Runnable tap){
+        boolean pressed=held(id);
+        g.rect(x,y,w,h,pressed?Theme.TRACK:Theme.RAISED);g.frame(x,y,w,h,1,pressed?Theme.REQUEST:Theme.BORDER);
+        g.text(caption,x+11,y+h*.36f,Gfx.MONO,10.5f,Theme.MUTED,Gfx.LEFT,.08f);
+        g.text(text,x+11,y+h*.36f+21,Gfx.MONO,13,pressed?Theme.REQUEST:Theme.PHOSPHOR,Gfx.LEFT,.04f);
+        g.text("‹ ›",x+w-11,y+h*.36f,Gfx.MONO,10.5f,Theme.DIM,Gfx.RIGHT,0);
+        final float start=shown(id,value);
+        hitDrag(id,x,y,w,h,new Drag(){
+            float x0,cur;boolean moved;
+            public void start(float px,float py){x0=px;cur=start;moved=false;}
+            public void move(float px,float py){
+                if(Math.abs(px-x0)>8)moved=true;
+                if(!moved)return;
+                float v=Math.max(min,Math.min(max,start+Math.round((px-x0)/unitsPerStep)));
+                if(Math.round(v)!=Math.round(cur)){cur=v;dragging.put(id,cur);set.accept(Math.round(cur));}
+            }
+            public void end(){if(moved)release(id,Math.round(cur));else if(tap!=null)tap.run();}
+        });
+    }
+
+    /** A sound's peak levels as vertical bars, centred on a line. */
+    public void waveform(float x,float y,float w,float h,float[] peaks,int color){
+        g.line(x,y+h/2,x+w,y+h/2,1,Theme.TRACK);
+        if(peaks==null||peaks.length==0)return;
+        int bars=Math.max(8,(int)(w/8));float step=w/bars;
+        for(int i=0;i<bars;i++){
+            float p=peaks[Math.min(peaks.length-1,i*peaks.length/bars)];
+            float bh=Math.max(2,h*Math.min(1,p));
+            g.rect(x+i*step+step*.2f,y+(h-bh)/2,Math.max(1.5f,step*.45f),bh,color);
+        }
+    }
+
+    /**
      * A conductor or parameter knob. Unipolar knobs sweep clockwise from 7 o'clock (minimum)
      * to 5 o'clock (maximum); bipolar knobs point to 12 at zero and show a centre tick.
      * Drag up or down anywhere in the touch area; move the finger sideways, away from the
