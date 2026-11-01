@@ -160,3 +160,8 @@ Check on the SM-T510 (and the Tab S6 Lite when available), in Focus and Performa
    restart, and confirm the edits are kept.
 6. Library: Preview each starter, import a WAV, change its root note, Load it, switch the playing
    source and play it from a MIDI controller; Delete it.
+7. Recording: Record, play for a minute, Stop recording; confirm SAVING then TAKE SAVED, and that the
+   file in Music/Paleotone plays on the PC at the right speed and pitch. Record again and press Stop All.
+   Record and leave the app; reopen and confirm the take is saved.
+8. Run timer: choose Custom 5 min on Start, Start a new run, start the environment with a take recording;
+   at 5:00 confirm the five-second fade, Run complete, the take saved and including the fade.

@@ -62,4 +62,10 @@ public interface Engine {
 
     /** Imported sounds for the keyboard and MIDI layer. */
     Library library();
+    /** Recording takes of the final mix. */
+    Recorder recorder();
+    /** Fades the whole mix to silence over ms; 0 restores full level. */
+    void fade(int ms);
+    /** True once a fade has reached silence. */
+    boolean faded();
 }

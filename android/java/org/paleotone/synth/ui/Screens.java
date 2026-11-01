@@ -17,7 +17,7 @@ public final class Screens {
     private Gfx g;private float W,H;
     private String sheetTitle;private String[] sheetOptions;private int sheetSelected;private IntConsumer sheetPick;
 
-    public Screens(Ui ui,UiState state,Engine engine){this.ui=ui;s=state;e=engine;}
+    public Screens(Ui ui,UiState state,Engine engine){this.ui=ui;s=state;e=engine;run=new Run(state,engine);}
 
     public void draw(){
         g=ui.g;W=ui.width;H=ui.height;
@@ -29,12 +29,15 @@ public final class Screens {
         switch(s.screen){
             case INSTRUMENT:if(focus)instrumentFocus();else instrumentPerformance();break;
             case SETTINGS:settings(cx,cy,cw,ch);break;
+            case RECORDING:recording(cx,cy,cw,ch);break;
+            case EXPEDITION:if(s.runPhase!=UiState.RUNNING&&!s.endDismissed)runEnd(cx,cy,cw,ch);else upcoming(cx,cy,cw,ch);break;
             case MIXER:mixer(cx,cy,cw,ch,focus);break;
             case SOUND_DESIGN:soundDesign(cx,cy,cw,ch,focus);break;
             case LIBRARY:library(cx,cy,cw,ch);break;
             default:upcoming(cx,cy,cw,ch);
         }
         if(s.quickMix)quickMix(cx,cy,cw,ch);
+        if(runSheet)runLengthSheet(cx,cy,cw,ch);
         if(sheetOptions!=null)sheet(cx,cy,cw,ch);
         bottomBar();
         notice();
@@ -52,11 +55,10 @@ public final class Screens {
         float ex=W-506;
         String key=listName(Engine.MOOD,MOODS).toUpperCase(Locale.ROOT)+"   "+e.text(Engine.TEMPO).toUpperCase(Locale.ROOT);
         g.text(key,ex-13,47,Gfx.MONO,12,Theme.PHOSPHOR,Gfx.RIGHT,.04f);
-        g.text("RUN ELAPSED / LENGTH",ex,32,Gfx.MONO,7.5f,Theme.MUTED,Gfx.LEFT,.12f);
-        g.text(clock(s.runElapsed)+" / "+(s.runLength==0?"CONTINUOUS":clock(s.runLength)),ex,52,Gfx.MONO,14,Theme.TEXT,Gfx.LEFT,0);
-        g.rect(ex,60,130,2.5f,Theme.TRACK);
-        float f=s.runLength==0?1:Math.min(1,(float)s.runElapsed/s.runLength);
-        g.rect(ex,60,130*f,2.5f,s.runLength==0?Theme.BORDER:Theme.PHOSPHOR);
+        g.text(runCaption(),ex,32,Gfx.MONO,7.5f,s.runPhase==UiState.ENDING?Theme.REQUEST:Theme.MUTED,Gfx.LEFT,.12f);
+        g.text(runClock(),ex,52,Gfx.MONO,14,Theme.TEXT,Gfx.LEFT,0);
+        runBar(ex,60,130);
+        ui.hit("header.runlength",ex-6,20,150,48,this::openRunLength);
         boolean focus=s.layout==UiState.Layout.FOCUS;
         ui.button("layout.focus",W-17-96-5-54,22,54,43,"Focus",focus?Ui.SELECTED:Ui.NORMAL,true,()->setLayout(UiState.Layout.FOCUS));
         ui.button("layout.performance",W-17-96,22,96,43,"Performance",focus?Ui.NORMAL:Ui.SELECTED,true,()->setLayout(UiState.Layout.PERFORMANCE));
@@ -83,7 +85,7 @@ public final class Screens {
     private void rail(){
         for(int i=0;i<UiState.NAVIGATION.length;i++){
             final UiState.Screen n=UiState.NAVIGATION[i];
-            boolean on=s.screen==n||(n==UiState.Screen.INSTRUMENT&&s.screen==UiState.Screen.SOUND_DESIGN);
+            boolean on=s.screen==n||(n==UiState.Screen.INSTRUMENT&&s.screen==UiState.Screen.SOUND_DESIGN)||(n==UiState.Screen.LIBRARY&&s.screen==UiState.Screen.RECORDING);
             ui.button("nav."+n,16,94+i*59,112,51,n.label,on?Ui.SELECTED:Ui.NORMAL,true,()->go(n));
         }
     }
@@ -91,11 +93,11 @@ public final class Screens {
         int count=UiState.NAVIGATION.length;float gap=10,w=(W-34-gap*(count-1))/count;
         for(int i=0;i<count;i++){
             final UiState.Screen n=UiState.NAVIGATION[i];
-            boolean on=s.screen==n||(n==UiState.Screen.INSTRUMENT&&s.screen==UiState.Screen.SOUND_DESIGN);
+            boolean on=s.screen==n||(n==UiState.Screen.INSTRUMENT&&s.screen==UiState.Screen.SOUND_DESIGN)||(n==UiState.Screen.LIBRARY&&s.screen==UiState.Screen.RECORDING);
             ui.button("nav."+n,17+i*(w+gap),634,w,53,n.label,on?Ui.SELECTED:Ui.NORMAL,true,()->go(n));
         }
     }
-    private void go(UiState.Screen n){s.screen=n;sheetOptions=null;s.quickMix=false;}
+    private void go(UiState.Screen n){s.screen=n;sheetOptions=null;s.quickMix=false;runSheet=false;}
 
     // ---- INSTRUMENT --------------------------------------------------------------------
     private void instrumentFocus(){
@@ -387,12 +389,7 @@ public final class Screens {
         right-=114;
         tabs("library.tab",right,y+4,new String[]{"Sound files","Recordings"},new float[]{118,110},s.libraryTab,n->s.libraryTab=n);
         float top=y+65,gw=(w-16)*.515f;
-        if(s.libraryTab==1){
-            ui.panel(x,top,w,h-65);
-            g.text("RECORDINGS",x+16,top+32,Gfx.DISPLAY,14.5f,Theme.PHOSPHOR,Gfx.LEFT,.02f);
-            g.text("Your takes will be listed here. Recording arrives in the next phase, as 16-bit WAV in Music/Paleotone.",x+16,top+64,Gfx.MONO,12.5f,Theme.MUTED,Gfx.LEFT,0);
-            return;
-        }
+        if(s.libraryTab==1){libraryRecordings(x,top,w,h-65);return;}
         Library.Sound selected=null;
         for(Library.Sound sound:sounds)if(sound.id.equals(s.librarySelected))selected=sound;
         if(selected==null&&sounds.length>0){selected=sounds[0];s.librarySelected=selected.id;}
@@ -463,6 +460,188 @@ public final class Screens {
         g.text("their own voices.",x+16,y+181,Gfx.MONO,12.5f,Theme.TEXT,Gfx.LEFT,0);
     }
 
+    // ---- RECORDING ---------------------------------------------------------------------
+    private static final String[] STATE_TITLES={"READY TO RECORD","RECORDING","SAVING TAKE","TAKE SAVED","TAKE NOT SAVED"};
+    private Recorder recorder(){return e.recorder();}
+    private void startTake(){
+        Recorder r=recorder();if(r==null)return;
+        if(r.state()==Recorder.ERROR){go(UiState.Screen.RECORDING);return;}
+        r.start(s.runName);
+    }
+    private void recording(float x,float y,float w,float h){
+        screenTitle("RECORDING",x,y);
+        Recorder r=recorder();
+        ui.tile("recording.length",x+w-95,y+1,95,52,"RUN LENGTH",Run.lengthText(s.nextRunLength).toUpperCase(Locale.ROOT),this::openRunLength);
+        ui.button("recording.back",x+w-95-12-152,y+4,152,47,"Back to Library",Ui.NORMAL,true,()->{s.libraryTab=1;go(UiState.Screen.LIBRARY);});
+        float top=y+65,lw=(w-14)*.57f,rx=x+lw+14,rw=x+w-rx;
+        ui.panel(x,top,lw,h-65);
+        int state=r==null?Recorder.READY:r.state();
+        boolean live=state==Recorder.RECORDING;
+        if(live)g.circle(x+21,top+29,5,Theme.REQUEST);else g.ring(x+21,top+29,4.5f,1.2f,Theme.MUTED);
+        g.text(STATE_TITLES[state],x+37,top+36,Gfx.DISPLAY,16,state==Recorder.ERROR?Theme.REQUEST:Theme.TEXT,Gfx.LEFT,.02f);
+        g.text(clock(r==null?0:r.takeMillis()),x+16,top+96,Gfx.MONO_MEDIUM,44,live?Theme.REQUEST:Theme.TEXT,Gfx.LEFT,0);
+        g.text("TAKE ELAPSED",x+17,top+113,Gfx.MONO,9.5f,Theme.MUTED,Gfx.LEFT,.06f);
+        g.line(x+16,top+126,x+lw-16,top+126,1,Theme.BORDER);
+        float[] levels=r==null?null:r.levels();
+        if(levels==null||levels.length==0)g.polyline(new float[]{x+16,top+164,x+lw-16,top+164},false,3,0xff8fd39b,7);
+        else ui.waveform(x+16,top+130,lw-32,68,levels,live?0xff8fd39b:0xff6f9a72);
+        g.line(x+16,top+202,x+lw-16,top+202,1,Theme.BORDER);
+        g.text("STEREO OUTPUT",x+16,top+230,Gfx.MONO,12.5f,Theme.TEXT,Gfx.LEFT,.04f);
+        g.text("Environment + music + played samples",x+16,top+251,Gfx.MONO,11,Theme.MUTED,Gfx.LEFT,0);
+        String name=r==null?null:r.takeName();
+        if(name!=null&&state!=Recorder.READY)g.text(name,x+16,top+285,Gfx.MONO,12,Theme.TEXT,Gfx.LEFT,0);
+        long free=r==null?-1:r.freeBytes();
+        if(free>=0){
+            long minutes=free/(48000L*4*60);
+            g.text(String.format(Locale.ROOT,"Free space %.1f GB, about %s of recording. Saved to %s.",free/1e9,minutes>=120?(minutes/60)+" h":minutes+" min",r.destination()),
+                x+16,top+312,Gfx.MONO,11,Theme.MUTED,Gfx.LEFT,0);
+        }
+        float by=top+h-65-108,bw=lw-32;
+        String note;
+        switch(state){
+            case Recorder.RECORDING:
+                ui.button("recording.stop",x+16,by,bw,47,"Stop recording",Ui.SELECTED,true,()->r.stop());
+                note="Stopping saves this take. The run keeps going.";break;
+            case Recorder.SAVING:
+                ui.button("recording.saving",x+16,by,bw,47,"Saving…",Ui.NORMAL,false,null);
+                note="Writing the file. It is not saved until this finishes.";break;
+            case Recorder.ERROR:
+                ui.button("recording.retry",x+16,by,(bw-12)/2,47,"Retry save",Ui.SELECTED,true,()->r.retry());
+                ui.button("recording.discard",x+16+(bw+12)/2,by,(bw-12)/2,47,"Discard take",Ui.NORMAL,true,()->
+                    choose("Discard this take?",new String[]{"Discard the take"},-1,n->r.discard()));
+                note=r.error()==null?"The take is kept for another save attempt.":"Save failed: "+r.error()+". The take is kept for another attempt.";break;
+            default:
+                ui.button("recording.start",x+16,by,bw,47,state==Recorder.SAVED?"Start a new take":"Start recording",Ui.SELECTED,r!=null,this::startTake);
+                note=state==Recorder.SAVED?"Saved. A new take starts from the moment you press it.":"A take starts from this moment. The run clock keeps its own time.";
+        }
+        g.text(note,x+16,by+70,Gfx.MONO,11,Theme.MUTED,Gfx.LEFT,0);
+        // This run
+        float py=top;
+        ui.panel(rx,py,rw,175);
+        g.text("THIS RUN",rx+13,py+27,Gfx.DISPLAY,13,Theme.PHOSPHOR,Gfx.LEFT,.02f);
+        g.text(s.runName,rx+13,py+55,Gfx.MONO,14,Theme.TEXT,Gfx.LEFT,.03f);
+        g.text(title(s.leader)+" / "+title(s.flavour),rx+13,py+78,Gfx.MONO,12,Theme.TEXT,Gfx.LEFT,0);
+        g.text(runCaption(),rx+13,py+100,Gfx.MONO,7.5f,Theme.MUTED,Gfx.LEFT,.12f);
+        g.text(runClock(),rx+13,py+119,Gfx.MONO,13,Theme.TEXT,Gfx.LEFT,0);
+        runBar(rx+13,py+127,Math.min(300,rw-120));
+        if(s.runPhase==UiState.RUNNING)ui.button("recording.endrun",rx+rw-104,py+96,91,40,"End run",Ui.NORMAL,true,()->run.end(ui.now));
+        g.text(s.runLength==0?"Continuous: the run ends when you choose End run.":"At "+clock(s.runLength)+" the run fades out, stops, and saves any active take.",
+            rx+13,py+158,Gfx.MONO,11,Theme.TEXT,Gfx.LEFT,0);
+        // Takes
+        py+=187;
+        Recorder.Take[] takes=r==null?new Recorder.Take[0]:r.takes();
+        int rows=Math.min(5,Math.max(1,takes.length));
+        float th=48+rows*33;
+        ui.panel(rx,py,rw,th);
+        g.text("TAKES",rx+13,py+27,Gfx.DISPLAY,13,Theme.PHOSPHOR,Gfx.LEFT,.02f);
+        takeRows(takes,rx+13,py+38,rw-26,5);
+        py+=th+12;
+        if(py+92<=top+h-65){
+            ui.panel(rx,py,rw,92);
+            g.text("RECORDING & SESSION",rx+13,py+27,Gfx.DISPLAY,13,Theme.PHOSPHOR,Gfx.LEFT,.02f);
+            g.text("Recording saves audio.",rx+13,py+54,Gfx.MONO,12,Theme.TEXT,Gfx.LEFT,0);
+            g.text("Save session keeps your controls and expedition.",rx+13,py+74,Gfx.MONO,12,Theme.TEXT,Gfx.LEFT,0);
+        }
+    }
+    private void takeRows(Recorder.Take[] takes,float x,float y,float w,int max){
+        if(takes.length==0){g.line(x,y,x+w,y,1,Theme.BORDER);g.text("No takes yet.",x,y+22,Gfx.MONO,11.5f,Theme.MUTED,Gfx.LEFT,0);return;}
+        for(int i=0;i<takes.length&&i<max;i++){
+            Recorder.Take t=takes[i];float ry=y+i*33;
+            g.line(x,ry,x+w,ry,1,Theme.BORDER);
+            g.clip(x,ry,w*.62f,33);g.text(t.name,x,ry+22,Gfx.MONO,11.5f,t.state==Recorder.SAVED?Theme.TEXT:Theme.REQUEST,Gfx.LEFT,0);g.unclip();
+            String status=t.state==Recorder.SAVED?"Saved / "+clock((long)(t.seconds*1000)):t.state==Recorder.RECORDING?"Recording":t.state==Recorder.SAVING?"Saving":"Save needed";
+            g.text(status,x+w,ry+22,Gfx.MONO,11.5f,t.state==Recorder.SAVED?Theme.TEXT:Theme.REQUEST,Gfx.RIGHT,0);
+        }
+    }
+    private void libraryRecordings(float x,float y,float w,float h){
+        ui.panel(x,y,w,h);
+        g.text("RECORDINGS",x+16,y+32,Gfx.DISPLAY,14.5f,Theme.PHOSPHOR,Gfx.LEFT,.02f);
+        Recorder r=recorder();
+        if(r!=null)g.text("16-bit stereo WAV, saved to "+r.destination(),x+16,y+56,Gfx.MONO,11.5f,Theme.MUTED,Gfx.LEFT,0);
+        ui.button("library.recording",x+w-176,y+12,160,47,"Open recording",Ui.NORMAL,true,()->go(UiState.Screen.RECORDING));
+        takeRows(r==null?new Recorder.Take[0]:r.takes(),x+16,y+80,w-32,12);
+    }
+
+    // ---- run clock, run length and run end -------------------------------------------
+    public final Run run;
+    private String runCaption(){return s.runPhase==UiState.ENDING?"RUN ENDING":s.runPhase==UiState.ENDED?"RUN COMPLETE":"RUN ELAPSED / LENGTH";}
+    private String runClock(){return clock(s.runElapsed)+" / "+(s.runLength==0?"CONTINUOUS":clock(s.runLength));}
+    private void runBar(float x,float y,float w){
+        g.rect(x,y,w,2.5f,Theme.TRACK);
+        float f=s.runLength==0?1:Math.min(1,(float)s.runElapsed/s.runLength);
+        g.rect(x,y,w*f,2.5f,s.runLength==0?Theme.BORDER:Theme.PHOSPHOR);
+    }
+    private boolean runSheet;private long runChoice;private int customMinutes=45;
+    public void openRunLength(){runSheet=true;runChoice=s.nextRunLength;sheetOptions=null;
+        if(runChoice>0&&runChoice!=15*60000L&&runChoice!=30*60000L&&runChoice!=60*60000L&&runChoice!=120*60000L)customMinutes=(int)(runChoice/60000);}
+    private void runLengthSheet(float x,float y,float w,float h){
+        g.rect(x,y,w,h,Theme.SCRIM);ui.block(x,y,w,h);
+        float pw=Math.min(850,w-40),ph=414,px=x+(w-pw)/2,py=y+(h-ph)/2;
+        ui.panel(px,py,pw,ph);ui.block(px,py,pw,ph);
+        g.text("NEW RUN / DURATION",px+25,py+31,Gfx.MONO,9.5f,Theme.REQUEST,Gfx.LEFT,.08f);
+        g.text("Choose the run length",px+25,py+68,Gfx.DISPLAY,21,Theme.TEXT,Gfx.LEFT,.01f);
+        long[] fixed={15*60000L,30*60000L,60*60000L,120*60000L,0};
+        float bw=(pw-50-20)/3;
+        boolean custom=true;for(long f:fixed)if(f==runChoice)custom=false;
+        for(int i=0;i<6;i++){
+            float bx=px+25+(i%3)*(bw+10),by=py+86+(i/3)*62;
+            if(i<5){final long len=fixed[i];
+                ui.button("run.length."+i,bx,by,bw,52,Run.lengthText(len),runChoice==len?Ui.SELECTED:Ui.NORMAL,true,()->runChoice=len);
+            }else{
+                if(custom)ui.dragTile("run.custom",bx,by,bw,52,"CUSTOM",customMinutes+" MIN",customMinutes,5,240,6,
+                    n->{customMinutes=n;runChoice=n*60000L;},null);
+                else ui.button("run.length.custom",bx,by,bw,52,"Custom…",Ui.NORMAL,true,()->runChoice=customMinutes*60000L);
+            }
+        }
+        g.text("Current run: "+runClock().toLowerCase(Locale.ROOT)+".",px+25,py+230,Gfx.MONO,12,Theme.TEXT,Gfx.LEFT,0);
+        g.text(custom?"Drag Custom sideways: 5 to 240 minutes. Applies when you begin a new run.":"This choice applies when you begin a new run.",px+25,py+249,Gfx.MONO,12,Theme.TEXT,Gfx.LEFT,0);
+        g.line(px+25,py+268,px+pw-25,py+268,1,Theme.BORDER);
+        g.text("WHEN A TIMED RUN ENDS",px+25,py+290,Gfx.DISPLAY,11.5f,Theme.PHOSPHOR,Gfx.LEFT,.02f);
+        g.text("Fade out over 5 seconds, stop the expedition audio, then save any active recording.",px+25,py+310,Gfx.MONO,12,Theme.TEXT,Gfx.LEFT,0);
+        g.text("Continuous runs end when you choose End run.",px+25,py+330,Gfx.MONO,9.5f,Theme.MUTED,Gfx.LEFT,0);
+        float hw=(pw-50-10)/2;
+        ui.button("run.cancel",px+25,py+ph-66,hw,44,"Cancel",Ui.NORMAL,true,()->runSheet=false);
+        ui.button("run.use",px+35+hw,py+ph-66,hw,44,"Use "+Run.lengthText(runChoice).toLowerCase(Locale.ROOT).replace("continuous","Continuous"),Ui.SELECTED,true,()->{s.nextRunLength=runChoice;runSheet=false;});
+    }
+    /** The closing and run-complete card, on Expedition. */
+    private void runEnd(float x,float y,float w,float h){
+        float cw=Math.min(820,w-40),ch=s.runPhase==UiState.ENDING?300:350,cx=x+(w-cw)/2,cy=y+(h-ch)/2-20;
+        ui.panel(cx,cy,cw,ch);
+        float mid=cx+cw/2;
+        g.text((s.runName+" / "+s.leader).toUpperCase(Locale.ROOT),mid,cy+30,Gfx.MONO,9.5f,Theme.MUTED,Gfx.CENTER,.06f);
+        g.text(s.runPhase==UiState.ENDING?"The expedition is closing.":"Run complete.",mid,cy+80,Gfx.PRINT,36,Theme.TEXT,Gfx.CENTER,0);
+        String big=clock(s.runElapsed),small=" / "+(s.runLength==0?"continuous":clock(s.runLength));
+        float bwid=g.textWidth(big,Gfx.MONO_MEDIUM,30,0),swid=g.textWidth(small,Gfx.MONO,16,0),sx=mid-(bwid+swid)/2;
+        g.text(big,sx,cy+134,Gfx.MONO_MEDIUM,30,Theme.TEXT,Gfx.LEFT,0);g.text(small,sx+bwid,cy+134,Gfx.MONO,16,Theme.MUTED,Gfx.LEFT,0);
+        Recorder r=recorder();int rs=r==null?Recorder.READY:r.state();
+        if(s.runPhase==UiState.ENDING){
+            long in=Math.min(Run.FADE_MS,Math.max(0,ui.now-s.fadeStart));
+            g.circle(mid-118,cy+170,4,Theme.REQUEST);
+            g.text("FADING OUT / "+clock(in)+" OF "+clock(Run.FADE_MS),mid+6,cy+175,Gfx.MONO,12.5f,Theme.REQUEST,Gfx.CENTER,.06f);
+            g.text(rs==Recorder.RECORDING?"Recording the fade. Your take will save when the sound stops.":"Audio stops when the fade ends.",mid,cy+207,Gfx.MONO,12,Theme.TEXT,Gfx.CENTER,0);
+            ui.button("runend.stopnow",mid-46,cy+232,92,47,"Stop now",Ui.SELECTED,true,run::finish);
+            return;
+        }
+        String take;
+        switch(rs){
+            case Recorder.SAVED:take=r.takeName()==null?"NO RECORDING":"TAKE SAVED";break;
+            case Recorder.SAVING:take="SAVING TAKE";break;
+            case Recorder.ERROR:take="TAKE NOT SAVED";break;
+            default:take="NO RECORDING";
+        }
+        boolean hadTake=rs!=Recorder.READY&&r.takeName()!=null;
+        g.text("ENVIRONMENT STOPPED   MUSIC STOPPED   "+take,mid,cy+166,Gfx.MONO,9.5f,rs==Recorder.ERROR?Theme.REQUEST:Theme.PHOSPHOR,Gfx.CENTER,.06f);
+        if(hadTake){
+            g.text(r.takeName(),mid,cy+194,Gfx.MONO,12.5f,Theme.TEXT,Gfx.CENTER,0);
+            g.text(clock(r.takeMillis())+" / stereo WAV",mid,cy+212,Gfx.MONO,10,Theme.MUTED,Gfx.CENTER,0);
+        }else g.text("Nothing was recorded during this run.",mid,cy+200,Gfx.MONO,12,Theme.MUTED,Gfx.CENTER,0);
+        float bw=(cw-50-12)/2,by=cy+228;
+        ui.button("runend.view",cx+25,by,bw,44,hadTake?"View recording":"Recording",Ui.NORMAL,true,()->go(UiState.Screen.RECORDING));
+        ui.button("runend.save",cx+37+bw,by,bw,44,"Save session",Ui.NORMAL,true,e::saveSession);
+        ui.button("runend.new",cx+25,by+56,bw,44,"Start a new run",Ui.SELECTED,true,run::newRun);
+        ui.button("runend.return",cx+37+bw,by+56,bw,44,"Return to expedition",Ui.NORMAL,true,()->s.endDismissed=true);
+    }
+
     // ---- other screens -------------------------------------------------------------------
     private void upcoming(float x,float y,float w,float h){
         ui.panel(x,y,w,h);
@@ -472,10 +651,18 @@ public final class Screens {
             case EXPEDITION:what="The expedition, encounters and the valley survey map are built in phase 5.";break;
             case JOURNAL:what="The field journal is built in phase 5.";break;
             case BESTIARY:what="The bestiary is built in phase 5.";break;
-            case START:what="Planning a new run and choosing its leader is built in phase 5.";break;
+            case START:what="Choosing the leader and place for a new run is built in phase 5.";break;
             default:what="";
         }
         g.text(what,x+24,y+80,Gfx.MONO,13,Theme.MUTED,Gfx.LEFT,0);
+        if(s.screen==UiState.Screen.START){
+            ui.button("start.length",x+24,y+110,220,50,"Run length: "+Run.lengthText(s.nextRunLength),Ui.NORMAL,true,this::openRunLength);
+            ui.button("start.new",x+256,y+110,200,50,"Start a new run",Ui.SELECTED,true,()->{run.newRun();go(UiState.Screen.INSTRUMENT);});
+            if(s.runPhase==UiState.RUNNING)ui.button("start.end",x+468,y+110,140,50,"End run",Ui.NORMAL,true,()->run.end(ui.now));
+            g.text("A new run starts the clock from zero with the chosen length. Earlier takes are kept.",x+24,y+190,Gfx.MONO,12,Theme.MUTED,Gfx.LEFT,0);
+        }
+        if(s.screen==UiState.Screen.EXPEDITION&&s.runPhase==UiState.ENDED)
+            ui.button("expedition.summary",x+24,y+110,200,50,"Run summary",Ui.NORMAL,true,()->s.endDismissed=false);
     }
     private void settings(float x,float y,float w,float h){
         ui.panel(x,y,w,h);
@@ -534,10 +721,21 @@ public final class Screens {
         ui.button("transport.music",169,714,145,47,music?"Stop music":"Play music",Ui.NORMAL,true,
             ()->e.scape(music?Engine.SCAPE_STOP_MUSIC:Engine.SCAPE_PLAY_MUSIC));
         g.text(music?"MUSIC LIVE":"MUSIC STOPPED",169+72.5f,777,Gfx.MONO,9,music?Theme.PHOSPHOR:Theme.MUTED,Gfx.CENTER,.04f);
-        ui.button("transport.stopall",323,723,128,47,"STOP ALL",Ui.STOP,true,e::stopAll);
+        ui.button("transport.stopall",323,723,128,47,"STOP ALL",Ui.STOP,true,run::stopAll);
         g.text(audio?"AUDIO ON":"AUDIO OFF",466,729,Gfx.MONO,9.5f,audio?Theme.PHOSPHOR:Theme.MUTED,Gfx.LEFT,.04f);
-        g.text("REC OFF",466,762,Gfx.MONO,9.5f,Theme.MUTED,Gfx.LEFT,.04f);
-        ui.button("record",W-529,723,128,47,"Record",Ui.NORMAL,false,null);
+        final Recorder r=recorder();int rs=r==null?Recorder.READY:r.state();
+        String rec;int recInk=Theme.MUTED;
+        switch(rs){
+            case Recorder.RECORDING:rec="REC / "+clock(r.takeMillis());recInk=Theme.REQUEST;g.circle(470,758,3.5f,Theme.REQUEST);break;
+            case Recorder.SAVING:rec="SAVING";recInk=Theme.REQUEST;break;
+            case Recorder.SAVED:rec="TAKE SAVED";recInk=Theme.PHOSPHOR;break;
+            case Recorder.ERROR:rec="SAVE NEEDED";recInk=Theme.REQUEST;break;
+            default:rec="REC OFF";
+        }
+        g.text(rec,rs==Recorder.RECORDING?479:466,762,Gfx.MONO,9.5f,recInk,Gfx.LEFT,.04f);
+        if(rs==Recorder.RECORDING)ui.button("record",W-529,723,128,47,"Stop recording",Ui.SELECTED,true,()->r.stop());
+        else if(rs==Recorder.ERROR)ui.button("record",W-529,723,128,47,"Save needed",Ui.SELECTED,true,()->go(UiState.Screen.RECORDING));
+        else ui.button("record",W-529,723,128,47,"Record",Ui.NORMAL,r!=null&&rs!=Recorder.SAVING,this::startTake);
         ui.button("quickmix",W-393,723,86,47,"Quick mix",s.quickMix?Ui.SELECTED:Ui.NORMAL,true,()->{s.quickMix=!s.quickMix;sheetOptions=null;});
         ui.button("save",W-123,723,106,47,"Save session",Ui.NORMAL,true,e::saveSession);
     }

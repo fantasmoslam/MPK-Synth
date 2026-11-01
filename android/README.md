@@ -10,7 +10,7 @@ The APK carries native libraries for both `armeabi-v7a` (the SM-T510's 32-bit us
 `arm64-v8a` (64-bit tablets such as the Galaxy Tab S6 Lite SM-P610 on official LineageOS 23.2).
 The 64-bit build has not yet been accepted on a device.
 
-## Round-three interface (0.4.0, phases 1 and 2)
+## Round-three interface (0.4.0, phases 1 to 3)
 
 The signed-off round-three design (Focus by default, Performance switchable) is the whole
 app; the old firmware panel and four-tab workspace are gone. `java/org/paleotone/synth/ui/`
@@ -36,15 +36,31 @@ sh android/preview/render.sh build/preview
   playing source (imported sample or Paleotone sounds) for keyboard and MIDI. Preview plays the root
   note through the sample layer for up to four seconds.
 
+- **Recording:** Record (bottom bar or Library → Recordings → Open recording) captures the final
+  stereo mix after the limiter as 16-bit WAV at the output rate (48 kHz on the test tablets). The
+  audio callback writes into a lock-free ring (`native/capture.h`, about 11 s); a writer thread
+  drains it into a private part file, and Stop completes the WAV header and copies the take to
+  Music/Paleotone (MediaStore; Android 9 uses the app's own Music folder). Only a completed copy is
+  reported saved. A failed or interrupted take keeps its part file for Retry save (also after a
+  restart) and blocks new takes until it is saved or discarded. Leaving the app or Stop All saves
+  the active take.
+- **Run timer:** 15, 30, 60, 120 minutes, Continuous, or Custom (5–240). The run clock counts while
+  audio runs; a new length applies to the next run (Start, or Start a new run). At the length, or
+  on End run, the clock holds, the mix fades over five seconds (an active take records the fade),
+  then the take saves and audio stops. Stop All or Stop now during the fade ends at once.
+- **Run end:** the closing card during the fade, then Run complete with the take's name and length,
+  or No recording.
+
 Knobs follow the review's zero rule: unipolar knobs sweep from 7 o'clock to 5 o'clock; only
 engine-marked bipolar parameters point to 12 at zero, with a centre tick. Not built yet: the
-notes are saved but not connected (their gauges show a dash); recording and the run timer
-(phase 3); the expedition, map, journal, bestiary and Start screens (phase 5).
+notes are saved but not connected (their gauges show a dash, phase 4); the expedition, map,
+journal, bestiary and Start screens (phase 5).
 
 Fonts (SIL OFL 1.1, licences in the APK's `assets/licenses`): Michroma, IBM Plex Mono,
 Caveat and IM FELL English. `android/tests/UiTest.java` checks the knob zero rule, both
 layouts on every screen at 1280 and 1333 units wide, dragging, layout switching, Stop All
-over sheets and quick mix, the dock, sound design edits and layer mutes.
+over sheets and quick mix, the dock, sound design edits, layer mutes, and the run timer and end.
+`android/tests/capture_test.c` checks the recording tap and the fade.
 
 ## Source baseline and scope
 

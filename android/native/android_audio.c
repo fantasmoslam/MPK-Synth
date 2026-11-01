@@ -13,6 +13,8 @@
 #include "display.h"
 #include "output_stage.h"
 #include "sample_layer.h"
+#include "capture.h"
+static pt_capture capture;   /* recording tap and run-end fade on the final mix */
 
 #define JNI(name) Java_org_paleotone_synth_Native_##name
 #define PIXELS (240*240)
@@ -149,6 +151,7 @@ static aaudio_data_callback_result_t audio_callback(AAudioStream *s, void *user,
     pt_render(out, (unsigned)frames, (unsigned)sample_rate);
     if(atomic_load(&sample_mode))sample_mix(&sampler,out,(unsigned)frames,(unsigned)sample_rate,atomic_load(&master_value)/1023.0f);
     float peak=pt_output_process(&output_stage,out,(unsigned)frames,output_gain());
+    capture_process(&capture,out,(unsigned)frames);
     atomic_store(&limited_frames,output_stage.limited);
     atomic_store(&peak_q15, (unsigned)(peak*32767));
     if(atomic_load_explicit(&snapshot_wanted,memory_order_relaxed)&&pt_ui_frames()!=snapshot_frame)publish_snapshot();
@@ -424,6 +427,22 @@ JNIEXPORT jobjectArray JNICALL JNI(controlNames)(JNIEnv *e,jclass c,jint slot){
     for(unsigned i=0;i<n;++i)put(e,a,i,names[i]);
     return a;
 }
+/* Recording and the run-end fade (capture.h). */
+JNIEXPORT void JNICALL JNI(recordStart)(JNIEnv *e,jclass c){(void)e;(void)c;capture_start(&capture);}
+JNIEXPORT void JNICALL JNI(recordStop)(JNIEnv *e,jclass c){(void)e;(void)c;capture_stop(&capture);}
+/* Copies captured interleaved stereo 16-bit samples; returns the count. */
+JNIEXPORT jint JNICALL JNI(recordRead)(JNIEnv *e,jclass c,jshortArray out){
+    (void)c;jsize cap=(*e)->GetArrayLength(e,out);static int16_t buffer[1u<<16];
+    unsigned n=capture_read(&capture,buffer,(unsigned)(cap<(jsize)(1u<<16)?cap:(jsize)(1u<<16)));
+    if(n)(*e)->SetShortArrayRegion(e,out,0,(jsize)n,buffer);
+    return (jint)n;
+}
+JNIEXPORT jint JNICALL JNI(recordDropped)(JNIEnv *e,jclass c){(void)e;(void)c;return (jint)atomic_load(&capture.dropped);}
+JNIEXPORT jint JNICALL JNI(sampleRate)(JNIEnv *e,jclass c){(void)e;(void)c;return sample_rate>0?sample_rate:48000;}
+JNIEXPORT void JNICALL JNI(fade)(JNIEnv *e,jclass c,jint ms){
+    (void)e;(void)c;capture_fade(&capture,ms<=0?0u:(unsigned)((long long)ms*(sample_rate>0?sample_rate:48000)/1000));
+}
+JNIEXPORT jboolean JNICALL JNI(faded)(JNIEnv *e,jclass c){(void)e;(void)c;return capture_faded(&capture)?JNI_TRUE:JNI_FALSE;}
 static jboolean voice_command(unsigned tag,jint track,jint k,jint value){
     if(track<0||track>3||value<-32768||value>32767)return JNI_FALSE;
     if(!stream){

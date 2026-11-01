@@ -9,7 +9,7 @@ public final class UiState {
     public enum Layout{FOCUS,PERFORMANCE}
     public enum Screen{
         EXPEDITION("Expedition"),INSTRUMENT("INSTRUMENT"),MIXER("Mixer"),LIBRARY("Library"),
-        JOURNAL("Journal"),BESTIARY("Bestiary"),START("Start"),SETTINGS("Settings"),SOUND_DESIGN("INSTRUMENT");
+        JOURNAL("Journal"),BESTIARY("Bestiary"),START("Start"),SETTINGS("Settings"),SOUND_DESIGN("INSTRUMENT"),RECORDING("Library");
         public final String label;
         Screen(String label){this.label=label;}
     }
@@ -47,7 +47,17 @@ public final class UiState {
 
     public String runName="LOWLAND STUDY",leader="WELLINGTON",flavour="CINEMATIC";
     /** Run clock in milliseconds; length 0 is Continuous. */
-    public long runElapsed,runLength;
+    public long runElapsed,runLength=30*60000L;
+    /** The length the next run uses; changes made during a run apply to the next one. */
+    public long nextRunLength=30*60000L;
+    /** RUNNING, then ENDING during the five-second fade, then ENDED. */
+    public static final int RUNNING=0,ENDING=1,ENDED=2;
+    public int runPhase;
+    /** When the fade began (Ui.now clock), and whether the run-end card was put away. */
+    public long fadeStart;
+    public boolean endDismissed;
+    /** Run number shown in take names and on the end screens. */
+    public int runNumber=1;
     public String notice;
     public long noticeUntil;
 
@@ -57,6 +67,8 @@ public final class UiState {
         for(int n:notes)b.append(';').append(n);
         for(int n:layerMuted)b.append(';').append(n);
         b.append(';').append(designPart).append(';').append(mixerPage);
+        b.append(';').append(runElapsed).append(';').append(runLength).append(';').append(nextRunLength)
+         .append(';').append(runPhase==ENDING?ENDED:runPhase).append(';').append(runNumber);
         return b.toString();
     }
     public void load(String saved){
@@ -68,6 +80,11 @@ public final class UiState {
             for(int i=0;i<8&&i+10<p.length;i++)layerMuted[i]=Math.max(-1,Math.min(100,Integer.parseInt(p[i+10])));
             if(p.length>18)designPart=Math.max(0,Math.min(3,Integer.parseInt(p[18])));
             if(p.length>19)mixerPage=Math.max(0,Math.min(1,Integer.parseInt(p[19])));
+            if(p.length>24){
+                runElapsed=Math.max(0,Long.parseLong(p[20]));runLength=Math.max(0,Long.parseLong(p[21]));
+                nextRunLength=Math.max(0,Long.parseLong(p[22]));runPhase=Math.max(0,Math.min(ENDED,Integer.parseInt(p[23])));
+                runNumber=Math.max(1,Integer.parseInt(p[24]));endDismissed=runPhase==ENDED;
+            }
             screen=Screen.valueOf(p[1]); // last: screens from older versions (the legacy panel) fall back to INSTRUMENT
         }catch(RuntimeException ignored){}
     }

@@ -47,8 +47,28 @@ public final class UiTest {
         public void setEngine(int part,int engine){engineSet=engine;}
         public void setPreset(int part,int preset){}
         public Library library(){return null;}
+        final FakeRecorder recorder=new FakeRecorder();
+        public Recorder recorder(){return recorder;}
+        int fadeMs=-1;boolean faded;
+        public void fade(int ms){fadeMs=ms;}
+        public boolean faded(){return faded;}
     }
 
+    static final class FakeRecorder implements Recorder {
+        int state=READY;int stops;String name;
+        public int state(){return state;}
+        public long takeMillis(){return 1000;}
+        public String takeName(){return name;}
+        public String error(){return state==ERROR?"disk full":null;}
+        public float[] levels(){return new float[0];}
+        public long freeBytes(){return 4_000_000_000L;}
+        public String destination(){return "Music/Paleotone";}
+        public void start(String run){state=RECORDING;name=run+"-take-01.wav";}
+        public void stop(){if(state==RECORDING){state=SAVED;stops++;}}
+        public void retry(){state=SAVED;}
+        public void discard(){state=READY;}
+        public Take[] takes(){return name==null?new Take[0]:new Take[]{new Take(name,1,state,null)};}
+    }
     static float pointerDegrees(RecordingGfx g){
         for(float[] l:g.lines)if((int)l[5]==Theme.REQUEST&&Math.abs(l[4]-3.2f)<.01f){
             double deg=Math.toDegrees(Math.atan2(l[2]-l[0],-(l[3]-l[1])));return (float)((deg+360)%360);
@@ -126,13 +146,43 @@ public final class UiTest {
         if(!engine.stopped)throw new AssertionError("Stop All works under quick mix");
         state.quickMix=false;
 
+        // Run timer: counts only with audio, ends at its length with a five-second fade that the take records.
+        UiState rs=new UiState();FakeEngine re=new FakeEngine();Run run=new Run(rs,re);
+        rs.runLength=60000;rs.runElapsed=0;
+        run.tick(0,30000,false);if(rs.runElapsed!=0)throw new AssertionError("run clock waits for audio");
+        run.tick(0,50000,true);run.tick(50000,20000,true);
+        if(rs.runPhase!=UiState.ENDING||rs.runElapsed!=60000||re.fadeMs!=Run.FADE_MS)throw new AssertionError("timed end holds the clock and fades");
+        re.recorder.start("RUN");run.tick(52000,2000,true);
+        if(rs.runPhase!=UiState.ENDING||re.recorder.state!=Recorder.RECORDING||re.stopped)throw new AssertionError("the fade runs its five seconds while recording");
+        run.tick(55000,3000,true);
+        if(rs.runPhase!=UiState.ENDED||re.recorder.state!=Recorder.SAVED||!re.stopped)throw new AssertionError("after the fade the take saves and sound stops");
+        // Stop All during the fade ends at once and keeps the take; a new run uses the next length.
+        rs=new UiState();re=new FakeEngine();run=new Run(rs,re);rs.runLength=0;rs.nextRunLength=15*60000L;
+        run.tick(0,100000,true);if(rs.runPhase!=UiState.RUNNING)throw new AssertionError("continuous runs never time out");
+        re.recorder.start("RUN");run.end(1000);run.stopAll();
+        if(rs.runPhase!=UiState.ENDED||re.recorder.stops!=1||!re.stopped)throw new AssertionError("Stop All during the fade saves the take and stops");
+        run.newRun();if(rs.runLength!=15*60000L||rs.runElapsed!=0||rs.runPhase!=UiState.RUNNING||rs.runNumber!=2)throw new AssertionError("new run");
+        // The end card and recording screen draw in both layouts.
+        Screens rsScreens=new Screens(new Ui(),rs,re);
+        for(UiState.Layout l:UiState.Layout.values())for(int phase=0;phase<3;phase++){
+            rs.layout=l;rs.runPhase=phase;rs.screen=UiState.Screen.EXPEDITION;rs.endDismissed=false;RecordingGfx rg=new RecordingGfx();
+            Ui u=new Ui();Screens sc=new Screens(u,rs,re);u.begin(rg,1280,800,0);sc.draw();u.end();
+            if(phase==UiState.ENDED&&!rg.texts.contains("Run complete."))throw new AssertionError("run complete card");
+            if(phase==UiState.ENDING&&!rg.texts.contains("The expedition is closing."))throw new AssertionError("closing card");
+        }
+        rs.runPhase=UiState.RUNNING;
+
         // Saved state round trip.
         UiState copy=new UiState();copy.load(state.save());
         if(copy.notes[0]!=dragged||copy.layout!=state.layout)throw new AssertionError("UI state round trip");
         state.layerMuted[5]=22;state.designPart=2;copy=new UiState();copy.load(state.save());
         if(copy.layerMuted[5]!=22||copy.designPart!=2)throw new AssertionError("layer mutes and part survive saving");
+        state.runElapsed=123456;state.runLength=0;state.nextRunLength=60*60000L;state.runPhase=UiState.ENDING;state.runNumber=4;
+        copy=new UiState();copy.load(state.save());
+        if(copy.runElapsed!=123456||copy.runLength!=0||copy.nextRunLength!=60*60000L||copy.runPhase!=UiState.ENDED||copy.runNumber!=4)
+            throw new AssertionError("run clock survives saving; an interrupted fade comes back ended");
         copy=new UiState();copy.load("FOCUS;LEGACY;1;2;3;4;5;6;7;8");
         if(copy.screen!=UiState.Screen.INSTRUMENT||copy.notes[7]!=8)throw new AssertionError("a saved legacy screen falls back to INSTRUMENT");
-        System.out.println("PASS: interface rules (knob zero, layouts, dragging, Stop All over sheets and quick mix, dock, sound design, layer mutes, saved state)");
+        System.out.println("PASS: interface rules (knob zero, layouts, dragging, Stop All over sheets and quick mix, dock, sound design, layer mutes, run timer and end, saved state)");
     }
 }

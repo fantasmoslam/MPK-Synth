@@ -38,6 +38,8 @@ javac -d build/android-tests android/java/org/paleotone/synth/AudioRecovery.java
 java -ea -cp build/android-tests org.paleotone.synth.AudioRecoveryTest
 javac -d build/android-tests android/java/org/paleotone/synth/KioskSession.java android/tests/KioskSessionTest.java
 java -ea -cp build/android-tests org.paleotone.synth.KioskSessionTest
+cc -O2 -std=c11 android/tests/capture_test.c -o build/android-tests/capture_test
+build/android-tests/capture_test
 cc -O2 -std=c11 android/tests/sample_test.c -lm -o build/android-tests/sample_test
 build/android-tests/sample_test
 javac -d build/android-tests android/java/org/paleotone/synth/WavSample.java android/tests/WavSampleTest.java

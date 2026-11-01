@@ -111,6 +111,28 @@ public final class Preview {
             public String status(){return null;}
         };
         public Library library(){return library;}
+        int recState=Recorder.READY;
+        final Recorder recorder=new Recorder(){
+            public int state(){return recState;}
+            public long takeMillis(){return recState==READY?0:314000;}
+            public String takeName(){return recState==READY?null:"Lowland-study-0472-take-03.wav";}
+            public String error(){return recState==ERROR?"No space left on device":null;}
+            public float[] levels(){if(recState==READY)return new float[0];float[] p=new float[90];java.util.Random r=new java.util.Random(9);for(int i=0;i<p.length;i++)p[i]=.3f+.65f*r.nextFloat();return p;}
+            public long freeBytes(){return 21_400_000_000L;}
+            public String destination(){return "Music/Paleotone";}
+            public void start(String run){}
+            public void stop(){}
+            public void retry(){}
+            public void discard(){}
+            public Take[] takes(){
+                Take[] t={new Take("Lowland-study-0472-take-01.wav",161,SAVED,null),new Take("Lowland-study-0472-take-02.wav",58,SAVED,null)};
+                if(recState==READY)return t;
+                return new Take[]{t[0],t[1],new Take("Lowland-study-0472-take-03.wav",314,recState,null)};
+            }
+        };
+        public Recorder recorder(){return recorder;}
+        public void fade(int ms){}
+        public boolean faded(){return false;}
         public void set(int slot,int value){v[slot]=value;}
         public boolean scape(int command){return true;}
         public boolean audioOn(){return true;}
@@ -134,7 +156,13 @@ public final class Preview {
             {"focus-sounddesign-voice-sheet","FOCUS","SOUND_DESIGN"},
             {"focus-quickmix","FOCUS","INSTRUMENT"},{"performance-quickmix","PERFORMANCE","MIXER"},
             {"focus-library","FOCUS","LIBRARY"},{"performance-library","PERFORMANCE","LIBRARY"},
-            {"focus-library-recordings","FOCUS","LIBRARY"}};
+            {"focus-library-recordings","FOCUS","LIBRARY"},
+            {"focus-recording-ready","FOCUS","RECORDING"},{"focus-recording-recording","FOCUS","RECORDING"},
+            {"focus-recording-error","FOCUS","RECORDING"},{"performance-recording-recording","PERFORMANCE","RECORDING"},
+            {"focus-instrument-recording","FOCUS","INSTRUMENT"},
+            {"focus-runlength","FOCUS","START"},{"focus-runend-ending","FOCUS","EXPEDITION"},
+            {"focus-runend-ended","FOCUS","EXPEDITION"},{"focus-runend-ended-no-take","FOCUS","EXPEDITION"},
+            {"performance-runend-ended","PERFORMANCE","EXPEDITION"}};
         for(String[] shot:shots)for(int width:new int[]{1920,2000}){
             float scale=1.5f;BufferedImage img=new BufferedImage(width,1200,BufferedImage.TYPE_INT_RGB);
             Graphics2D g=img.createGraphics();g.scale(scale,scale);
@@ -145,9 +173,16 @@ public final class Preview {
             if(shot[0].contains("quickmix"))state.quickMix=true;
             if(shot[0].contains("recordings"))state.libraryTab=1;
             if(shot[0].equals("focus-library")||shot[0].equals("performance-library"))state.librarySelected="c";
+            if(shot[0].contains("-recording")&&!shot[0].contains("library"))engine.recState=Recorder.RECORDING;
+            if(shot[0].endsWith("error"))engine.recState=Recorder.ERROR;
+            if(shot[0].contains("runend-ended")&&!shot[0].endsWith("no-take"))engine.recState=Recorder.SAVED;
+            if(shot[0].contains("runend-ending"))engine.recState=Recorder.RECORDING;
+            if(shot[0].contains("runend")){state.runElapsed=state.runLength;state.runPhase=shot[0].contains("ending")?UiState.ENDING:UiState.ENDED;}
+            long now=shot[0].contains("ending")?3000:0;
+            if(shot[0].endsWith("runlength"))screens.openRunLength();
             if(shot[0].endsWith("biome-sheet"))screens.choose("Biome",Screens.BIOMES,1,v->{});
             if(shot[0].endsWith("voice-sheet")){Engine.Choice[] c=engine.engines();String[] n=new String[c.length];for(int i=0;i<n.length;i++)n[i]=c[i].name;screens.choose("Voice for part 1",n,0,v->{});}
-            ui.begin(new Java2dGfx(g,fonts),width/scale,1200/scale,0);screens.draw();ui.end();
+            ui.begin(new Java2dGfx(g,fonts),width/scale,1200/scale,now);screens.draw();ui.end();
             g.dispose();
             ImageIO.write(img,"png",new File(out,shot[0]+(width==2000?"-2000":"")+".png"));
         }

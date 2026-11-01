@@ -34,4 +34,13 @@ final class Native {
     /** "index\tname" per engine or preset. */
     static native String[] engines();
     static native String[] presets(int engine);
+    /** Recording tap on the final mix: interleaved stereo 16-bit at sampleRate(). */
+    static native void recordStart();
+    static native void recordStop();
+    static native int recordRead(short[] out);
+    static native int recordDropped();
+    static native int sampleRate();
+    /** Fades the final mix to silence over ms (0 restores full level); faded() once silent. */
+    static native void fade(int ms);
+    static native boolean faded();
 }

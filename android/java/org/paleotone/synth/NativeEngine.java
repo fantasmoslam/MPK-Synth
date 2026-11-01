@@ -6,6 +6,7 @@ import android.os.SystemClock;
 import java.util.HashMap;
 import org.paleotone.synth.ui.Engine;
 import org.paleotone.synth.ui.Library;
+import org.paleotone.synth.ui.Recorder;
 
 /** The interface's view of the native engine: a 10 Hz snapshot of the control table, and commands. */
 final class NativeEngine implements Engine {
@@ -14,13 +15,13 @@ final class NativeEngine implements Engine {
     private int[] state;private String[] texts;
     private int master;
     private final SharedPreferences scapePrefs;
-    private final AndroidLibrary library;
+    private final AndroidLibrary library;private final AndroidRecorder recorder;
     private final Voice[] voices=new Voice[4];private final long[] voiceRead=new long[4];
     private final HashMap<Integer,String[]> names=new HashMap<>();
     private Choice[] engines;private final HashMap<Integer,Choice[]> presets=new HashMap<>();
 
-    NativeEngine(MainActivity activity,AndroidLibrary library){
-        this.activity=activity;this.library=library;labels=Native.controlLabels();
+    NativeEngine(MainActivity activity,AndroidLibrary library,AndroidRecorder recorder){
+        this.activity=activity;this.library=library;this.recorder=recorder;labels=Native.controlLabels();
         state=Native.controls();texts=Native.controlTexts();
         scapePrefs=activity.getSharedPreferences("scape",0);
         master=activity.getPreferences(0).getInt("master",700);Native.master(master);
@@ -96,6 +97,9 @@ final class NativeEngine implements Engine {
         voiceRead[part]=0;
     }
     public Library library(){return library;}
+    public Recorder recorder(){return recorder;}
+    public void fade(int ms){Native.fade(ms);}
+    public boolean faded(){return Native.faded();}
     public void action(String name){
         switch(name){
             case "audio":activity.action(3);break;

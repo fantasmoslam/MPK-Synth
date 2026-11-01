@@ -16,6 +16,7 @@ import java.io.*;
 public final class MainActivity extends Activity {
     private PhosphorView view;
     private AndroidLibrary library;
+    private AndroidRecorder recorder;
     private NativeEngine engine;
     private final org.paleotone.synth.ui.UiState uiState=new org.paleotone.synth.ui.UiState();
     private long lastTick;
@@ -72,7 +73,7 @@ public final class MainActivity extends Activity {
             lastReport=now;String report=Native.report();
             if(report!=null)Log.i("PaleotoneAudio",Build.MODEL+" | "+report);
         }
-        if(lastTick!=0&&running)uiState.runElapsed+=now-lastTick;
+        view.screens.run.tick(now,lastTick==0?0:now-lastTick,running);
         lastTick=now;
         if(++tick%3==0)engine.refresh();
         view.tick();
@@ -94,7 +95,8 @@ public final class MainActivity extends Activity {
         byte[] saved=null;
         try { saved=session.readFully(); } catch(IOException ignored) {}
         Native.init(saved);
-        library=new AndroidLibrary(this);engine=new NativeEngine(this,library);
+        Native.fade(0);
+        library=new AndroidLibrary(this);recorder=new AndroidRecorder(this);engine=new NativeEngine(this,library,recorder);
         uiState.load(getPreferences(MODE_PRIVATE).getString("ui",null));
         view=new PhosphorView(this,uiState,engine);setContentView(view);
         midi=new MidiInput(this);
@@ -113,7 +115,7 @@ public final class MainActivity extends Activity {
     void maintenance(){KioskController.menu(this);}
     @Override protected void onPause(){
         resumed=false;wantAudio=false;recovery.cancel();handler.removeCallbacks(refresh);
-        midi.close();Native.stop();running=false;
+        recorder.stop();midi.close();Native.stop();running=false;
         writeSession();
         getPreferences(MODE_PRIVATE).edit().putString("ui",uiState.save()).apply();lastTick=0;
         if(focusHeld)audio.abandonAudioFocus(focus);focusHeld=false;
@@ -144,7 +146,8 @@ public final class MainActivity extends Activity {
     }
     void ensureAudio(){if(!running)startAudio();}
     void stopAllScape(){
-        wantAudio=false;recovery.cancel();Native.stop();running=false;
+        recorder.stop();
+        wantAudio=false;recovery.cancel();Native.stop();running=false;Native.fade(0);
         Native.scape(7);notice("Stopped. Environment, drone, music and audio are off");
     }
     void pickSample(Intent intent){
