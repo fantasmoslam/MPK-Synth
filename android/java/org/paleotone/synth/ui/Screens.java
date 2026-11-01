@@ -730,14 +730,14 @@ public final class Screens {
     // ---- bottom bar ------------------------------------------------------------------------
     private void bottomBar(){
         g.line(16,698,W-16,698,1,Theme.BORDER);
-        boolean ready=e.habitatEngine();
-        boolean audio=e.audioOn(),env=ready&&audio&&e.value(Engine.HABITAT)>0,music=ready&&audio&&e.musicPlaying();
+        boolean ready=e.habitatEngine(),musicReady=e.musicEngine();
+        boolean audio=e.audioOn(),env=ready&&audio&&e.value(Engine.HABITAT)>0,music=musicReady&&audio&&e.musicPlaying();
         ui.button("transport.environment",16,714,145,47,env?"Pause environment":"Start environment",Ui.NORMAL,ready,
             ()->e.scape(env?Engine.SCAPE_PAUSE_ENVIRONMENT:Engine.SCAPE_START_ENVIRONMENT));
         g.text(!ready?"NEW ENGINE PENDING":env?"ENVIRONMENT LIVE":"ENVIRONMENT OFF",16+72.5f,777,Gfx.MONO,9,env?Theme.PHOSPHOR:Theme.MUTED,Gfx.CENTER,.04f);
-        ui.button("transport.music",169,714,145,47,music?"Stop music":"Play music",Ui.NORMAL,ready,
+        ui.button("transport.music",169,714,145,47,music?"Stop music":"Play music",Ui.NORMAL,musicReady,
             ()->e.scape(music?Engine.SCAPE_STOP_MUSIC:Engine.SCAPE_PLAY_MUSIC));
-        g.text(!ready?"NEW ENGINE PENDING":music?"MUSIC LIVE":"MUSIC STOPPED",169+72.5f,777,Gfx.MONO,9,music?Theme.PHOSPHOR:Theme.MUTED,Gfx.CENTER,.04f);
+        g.text(!musicReady?"NEW ENGINE PENDING":music?"MUSIC LIVE":"MUSIC STOPPED",169+72.5f,777,Gfx.MONO,9,music?Theme.PHOSPHOR:Theme.MUTED,Gfx.CENTER,.04f);
         ui.button("transport.stopall",323,723,128,47,"STOP ALL",Ui.STOP,true,run::stopAll);
         g.text(audio?"AUDIO ON":"AUDIO OFF",466,729,Gfx.MONO,9.5f,audio?Theme.PHOSPHOR:Theme.MUTED,Gfx.LEFT,.04f);
         final Recorder r=recorder();int rs=r==null?Recorder.READY:r.state();

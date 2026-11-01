@@ -41,6 +41,7 @@ class Conductor {
   ~Conductor();
   void start(double t);            /* begin the expedition (dawn) at engine time t */
   void stop();                     /* lead into the coda, then fall silent */
+  void halt(double t);             /* end at once: drop what is written from t, let the drone die away */
   bool running() const;
   void tick(double now);           /* call often (every few ms to 50 ms) with the engine clock: writes ahead */
   void note(int note, int value);  /* 0..100 */

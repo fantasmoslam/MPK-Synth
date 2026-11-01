@@ -14,6 +14,7 @@
 #include "output_stage.h"
 #include "sample_layer.h"
 #include "capture.h"
+#include "paleo_bridge.h"   /* PALEO and the live Scape conductor */
 static pt_capture capture;   /* recording tap and run-end fade on the final mix */
 /* The old DINOBOX Scape (habitat, drone, creature calls, loop music) is switched off in the
  * round-three app until the new conductor and habitat replace it. The firmware keeps it;
@@ -159,6 +160,7 @@ static aaudio_data_callback_result_t audio_callback(AAudioStream *s, void *user,
     inputs();
     pt_render(out, (unsigned)frames, (unsigned)sample_rate);
     if(atomic_load(&sample_mode))sample_mix(&sampler,out,(unsigned)frames,(unsigned)sample_rate,atomic_load(&master_value)/1023.0f);
+    paleo_mix(out,(unsigned)frames,.8f*atomic_load(&master_value)/1023.0f);
     float peak=pt_output_process(&output_stage,out,(unsigned)frames,output_gain());
     capture_process(&capture,out,(unsigned)frames);
     atomic_store(&limited_frames,output_stage.limited);
@@ -292,6 +294,7 @@ JNIEXPORT jstring JNICALL JNI(start)(JNIEnv *env,jclass cls,jint buffers) {
     buffer_frames=AAudioStream_getBufferSizeInFrames(stream);
     pt_output_init(&output_stage,(unsigned)sample_rate,output_gain());
     if (sample_rate!=prepared_rate) { pt_prepare((unsigned)sample_rate); prepared_rate=sample_rate; }
+    paleo_prepare((unsigned)sample_rate);
     started_ns=nanos();
     atomic_store(&limited_frames,0);
     result=AAudioStream_requestStart(stream);

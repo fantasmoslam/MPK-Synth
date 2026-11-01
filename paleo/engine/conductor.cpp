@@ -614,6 +614,12 @@ void Conductor::stop() {
   std::lock_guard<std::recursive_mutex> l(p->m);
   if (!p->started || p->stopping) return; p->stopping = true; p->request(kCoda, 1, "stop: into the coda");
 }
+void Conductor::halt(double t) {
+  std::lock_guard<std::recursive_mutex> l(p->m);
+  if (!p->started || p->finished) return;
+  p->eng.cancel_from(t); if (p->drone_h) p->eng.release(p->drone_h, t + 1.5);
+  p->drone_h = 0; p->drone_midi = -1; p->finished = true; p->mark(t, "halt");
+}
 bool Conductor::running() const { return p->started && !p->finished; }
 void Conductor::tick(double now) { std::lock_guard<std::recursive_mutex> l(p->m); p->tick(now); }
 void Conductor::note(int k, int v) {

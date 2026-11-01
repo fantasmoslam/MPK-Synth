@@ -86,6 +86,8 @@ void flush_denormals() {
   _mm_setcsr(_mm_getcsr() | 0x8040);
 #elif defined(__aarch64__)
   unsigned long long f; asm volatile("mrs %0, fpcr" : "=r"(f)); asm volatile("msr fpcr, %0" ::"r"(f | (1ull << 24)));
+#elif defined(__arm__) && defined(__ARM_FP)
+  unsigned f; asm volatile("vmrs %0, fpscr" : "=r"(f)); asm volatile("vmsr fpscr, %0" ::"r"(f | (1u << 24)));
 #endif
 }
 double now_s() { return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
@@ -157,7 +159,7 @@ struct Reverb {
 }  // namespace
 
 struct Engine::Impl {
-  Options o; int sr; long long t = 0;
+  Options o; int sr; long long t = 0; std::atomic<long long> t_pub{0};   /* t_pub: t as published to other threads */
   Part parts[kNumParts]; std::vector<Pending> pend; size_t pend_i = 0;
   std::vector<Task> tasks; int ntasks = 0; Pool pool;
   Reverb hall, room, tailr; Follower duckf, gluef;
@@ -451,7 +453,7 @@ struct Engine::Impl {
       for (int a = 0; a < int(P.act.size());) { Voice& v = P.v[P.act[a]]; if (t + n >= v.end) { v.active = false; P.act.erase(P.act.begin() + a); } else a++; }
     }
     mix(L, R, n);
-    t += n;
+    t += n; t_pub.store(t, std::memory_order_release);
     for (size_t i = 0; i < shots.size();) { if (shots[i].start + (long long)shots[i].L.size() <= t) { shots[i] = std::move(shots.back()); shots.pop_back(); } else i++; }
   }
 
@@ -533,7 +535,7 @@ struct Engine::Impl {
     }
   }
   void reset_state() {
-    t = 0; cvoices.clear(); cpend_i = 0;
+    t = 0; t_pub.store(0); cvoices.clear(); cpend_i = 0;
     for (auto& P : parts) { for (auto& v : P.v) v.active = false; P.act.clear(); }
     /* fresh effects so the pre-pass leaves nothing behind */
     for (auto& P : parts) {
@@ -568,7 +570,7 @@ void Engine::render(float* L, float* R, int frames) {
   while (done < frames) { int n = std::min(kMaxBlock, frames - done); p->render_block(L + done, R + done, n); done += n; }
   p->load = (now_s() - t0) / (double(frames) / p->sr);
 }
-double Engine::seconds() const { return double(p->t) / p->sr; }
+double Engine::seconds() const { return double(p->t_pub.load(std::memory_order_acquire)) / p->sr; }
 double Engine::length() const { return p->len; }
 int Engine::threads() const { return int(p->pool.th.size()) + 1; }
 double Engine::last_load() const { return p->load; }

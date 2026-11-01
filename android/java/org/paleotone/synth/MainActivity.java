@@ -97,6 +97,7 @@ public final class MainActivity extends Activity {
         byte[] saved=null;
         try { saved=session.readFully(); } catch(IOException ignored) {}
         Native.init(saved);
+        Native.paleoLibrary(getAssets());   // decodes the creature calls in the background
         Native.fade(0);
         library=new AndroidLibrary(this);recorder=new AndroidRecorder(this);engine=new NativeEngine(this,library,recorder);
         uiState.load(getPreferences(MODE_PRIVATE).getString("ui",null));
@@ -149,6 +150,7 @@ public final class MainActivity extends Activity {
     void ensureAudio(){if(!running)startAudio();}
     void stopAllScape(){
         recorder.stop();
+        Native.paleoHalt();
         wantAudio=false;recovery.cancel();Native.stop();running=false;Native.fade(0);
         Native.scape(7);notice("Stopped. Environment, drone, music and audio are off");
     }

@@ -46,12 +46,15 @@ final class NativeEngine implements Engine {
         if(command==SCAPE_DRONE_ON&&value(DRONE)==0)set(DRONE,scapePrefs.getInt("droneLevel",40));
         if(command==SCAPE_PAUSE_ENVIRONMENT&&value(HABITAT)>0)scapePrefs.edit().putInt("environmentLevel",value(HABITAT)).apply();
         if(command==SCAPE_START_ENVIRONMENT||command==SCAPE_PLAY_MUSIC)activity.ensureAudio();
+        // Music is the new conductor; the old Scape's music stays off.
+        if(command==SCAPE_PLAY_MUSIC||command==SCAPE_STOP_MUSIC){Native.paleoMusic(command==SCAPE_PLAY_MUSIC);return true;}
         boolean ok=Native.scape(command);
         if(!ok)activity.notice("Control queue busy — try again");
         return ok;
     }
     public boolean audioOn(){return activity.audioRunning();}
-    public boolean musicPlaying(){return state[labels.length*3]!=0;}
+    /** Loading or playing; the coda after Stop music counts as stopped. */
+    public boolean musicPlaying(){int s=Native.paleoState();return s==1||s==2;}
     public int master(){return master;}
     public void setMaster(int value){master=value;Native.master(value);activity.getPreferences(0).edit().putInt("master",value).apply();}
     public void stopAll(){if(value(HABITAT)>0)scapePrefs.edit().putInt("environmentLevel",value(HABITAT)).apply();activity.stopAllScape();}
@@ -98,6 +101,13 @@ final class NativeEngine implements Engine {
     }
     public Library library(){return library;}
     public boolean habitatEngine(){return false;}
+    public boolean musicEngine(){return true;}
+    public void conductorNote(int note,int value){Native.paleoNote(note,value);}
+    public int conductorNoteValue(int note){return Native.paleoNoteValue(note);}
+    public void conductorAction(int action){Native.paleoAction(action);}
+    public float[] conductorGauges(){return Native.paleoGauges();}
+    public String conductorGaugeText(int gauge){return Native.paleoGaugeText(gauge);}
+    public int conductorScene(){return Native.paleoSceneNow();}
     public Recorder recorder(){return recorder;}
     public void fade(int ms){Native.fade(ms);}
     public boolean faded(){return Native.faded();}

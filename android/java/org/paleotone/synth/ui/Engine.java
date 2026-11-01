@@ -67,6 +67,20 @@ public interface Engine {
      * are not yet ported: the environment, drone, layers and music controls wait.
      */
     boolean habitatEngine();
+    /** True when the new Scape conductor (PALEO) is in this build: Play music and the notes, actions and gauges work. */
+    default boolean musicEngine(){return habitatEngine();}
+    /** The player's notes to the conductor, 0..100 (Danger, Majesty, Density, Pace, Space, Wildness, Drift, Silence).
+     *  Kept before an expedition starts and carried into it. */
+    default void conductorNote(int note,int value){}
+    default int conductorNoteValue(int note){return 50;}
+    /** An expedition action, in Expedition.ACTIONS order: the music turns within a beat or two. */
+    default void conductorAction(int action){}
+    /** The conductor's eight gauges 0..1 (Threat, Awe, Parts, Phrases, Depth, Habitat, Harmony, Music); negative = not answering. */
+    default float[] conductorGauges(){return null;}
+    /** A gauge's word, e.g. "WALKING" or "bII"; empty when it has none. */
+    default String conductorGaugeText(int gauge){return "";}
+    /** The scene playing now (0 dawn .. 12 coda), -1 when silent. */
+    default int conductorScene(){return -1;}
     /** Recording takes of the final mix. */
     Recorder recorder();
     /** Fades the whole mix to silence over ms; 0 restores full level. */

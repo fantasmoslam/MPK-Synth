@@ -43,4 +43,24 @@ final class Native {
     /** Fades the final mix to silence over ms (0 restores full level); faded() once silent. */
     static native void fade(int ms);
     static native boolean faded();
+
+    // ---- PALEO and the live Scape conductor (android/native/paleo_bridge.cpp)
+    /** Starts loading the creature library from the APK's assets/creatures. Call once. */
+    static native void paleoLibrary(android.content.res.AssetManager assets);
+    /** true: a new expedition; false: into the coda, then silence. */
+    static native void paleoMusic(boolean on);
+    /** Ends the music at once (Stop all). */
+    static native void paleoHalt();
+    /** 0 silent, 1 loading, 2 playing, 3 into the coda. */
+    static native int paleoState();
+    static native void paleoNote(int note,int value);
+    static native int paleoNoteValue(int note);
+    static native void paleoAction(int action);
+    static native void paleoScene(int scene,int urgency);
+    static native int paleoSceneNow();
+    static native float[] paleoGauges();
+    static native String paleoGaugeText(int gauge);
+    /** The last few things the conductor did, one per line. */
+    static native String paleoMarks();
+    static native float paleoLoad();
 }
