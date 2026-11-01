@@ -1,0 +1,46 @@
+name: PALEO speed test
+on:
+  workflow_dispatch:
+  push:
+    paths: ['android/paleo-bench/**', 'paleo/faust/**', '.github/workflows/paleo-bench.yml']
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - name: Install the NDK
+        run: sdkmanager 'ndk;27.2.12479018'
+      - name: Run on the CI computer (a smoke test)
+        run: sh android/paleo-bench/build.sh host && build/paleo-bench/host/paleo-bench
+      - name: Build for the tablets
+        run: sh android/paleo-bench/build.sh && file build/paleo-bench/*/paleo-bench
+      - uses: actions/upload-artifact@v4
+        with:
+          name: paleo-bench
+          path: |
+            build/paleo-bench/arm64-v8a/paleo-bench
+            build/paleo-bench/armeabi-v7a/paleo-bench
+          retention-days: 30
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Build for Windows (x64)
+        shell: cmd
+        run: |
+          mkdir build\paleo-bench\windows-x64
+          cl /nologo /O2 /std:c++17 /EHsc /w /arch:AVX2 /Fe:build\paleo-bench\windows-x64\paleo-bench.exe /Ipaleo\faust android\paleo-bench\bench.cpp paleo\faust\gen\*.cpp
+      - name: Smoke test
+        run: build\paleo-bench\windows-x64\paleo-bench.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: paleo-bench-windows
+          path: build/paleo-bench/windows-x64/paleo-bench.exe
+          retention-days: 30

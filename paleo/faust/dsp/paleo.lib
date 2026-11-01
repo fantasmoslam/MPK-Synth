@@ -1,0 +1,27 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Shared parts for Paleotone's prehistoric instruments (and SAURUS): controls, throat formants, modal bodies.
+import("stdfaust.lib");
+f  = nentry("freq",100,10,4000,0.001);
+g  = nentry("gain",1,0,1,0.001);
+t  = button("gate");
+p1 = nentry("p1",0,0,4,0.001) : si.smoo;   // vowel / mouth shape
+trig = t : ba.impulsify;
+// five-formant throat, as in SAURUS: vowel 0..4 = a e i o u, sz scales the throat
+fa = (600,1040,2250,2450,2750); fe = (400,1620,2400,2800,3100); fi_ = (250,1750,2600,3050,3340);
+fo = (400,750,2400,2600,2900);  fu = (350,600,2400,2675,2950);
+ga = (1,0.45,0.35,0.35,0.1); ge = (1,0.25,0.35,0.25,0.1); gi = (1,0.18,0.25,0.25,0.1);
+go = (1,0.5,0.2,0.2,0.08); gu = (1,0.4,0.1,0.1,0.05);
+mixv(x,y,u) = x*(1-u) + y*u;
+pick(v,k,a,e,i,o,u) = select2(v<1, select2(v<2, select2(v<3, mixv(ba.take(k,o),ba.take(k,u),v-3),
+                                                         mixv(ba.take(k,i),ba.take(k,o),v-2)),
+                                           mixv(ba.take(k,e),ba.take(k,i),v-1)),
+                             mixv(ba.take(k,a),ba.take(k,e),v));
+throat(v,sz,x) = x <: par(k,5, fi.resonbp(fq(k+1), fq(k+1)/(fq(k+1)*0.08+40), pick(v,k+1,ga,ge,gi,go,gu))) :> _
+with { fq(k) = pick(v,k,fa,fe,fi_,fo,fu)*sz : max(60) : min(9000); };
+// modal body: n modes with ratios R, decay times T (s) and gains G, struck by x
+modal(fr,R,T,G,x) = x <: par(i,ba.count(R), pm.modeFilter(fr*ba.take(i+1,R), ba.take(i+1,T), ba.take(i+1,G))) :> _;
+// a soft mallet / hand strike: a short raised-cosine thump plus a little dark noise
+strike(ms,dark) = (en.ar(ms*0.0005, ms*0.0005, trig) + no.noise*en.ar(0.0002,ms*0.001,trig)*0.3) : fi.lowpass(1,dark);
+// plucked string (Karplus-Strong): x excites a delay loop tuned to fr (the loop and its filter delay are taken off);
+// br 0.5..0.95 brightness, fb loop gain (decay)
+kstring(fr,br,fb,x) = x : (+ ~ (de.fdelay(8192, ma.SR/fr - 2 + br) : (_ <: _*br, _'*(1-br) :> _) : *(fb)));

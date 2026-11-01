@@ -1,0 +1,65 @@
+name: PALEO engine
+on:
+  workflow_dispatch:
+  push:
+    paths: ['paleo/**', '.github/workflows/paleo.yml']
+permissions:
+  contents: read
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: sh paleo/build.sh
+      - name: Render STAMPEDE offline (instruments, effects and the creature library)
+        run: |
+          sudo apt-get install -y -qq ffmpeg >/dev/null
+          build/paleo/paleo-render paleo/scores/stampede.txt build/paleo/stampede.wav --seconds 156 --threads 4 --lead fiddle 2>&1 | tee build/log.txt
+          grep -q "creature library: 126 calls" build/log.txt
+          I=$(ffmpeg -i build/paleo/stampede.wav -af ebur128 -f null - 2>&1 | grep -E '^\s+I:' | tail -1 | awk '{print $2}')
+          ffmpeg -y -loglevel error -i build/paleo/stampede.wav -af "volume=$(python3 -c "print(-13.5-($I))")dB,alimiter=limit=0.93:attack=2:release=60:level=false,afade=t=out:st=153:d=3" -b:a 224k build/paleo/paleo-stampede.mp3
+      - name: Live player smoke test (silent output)
+        run: timeout 25 build/paleo/paleo-play paleo/scores/stampede.txt --null || test $? = 124
+      - uses: actions/upload-artifact@v4
+        with:
+          name: paleo-stampede-mp3
+          path: build/paleo/paleo-stampede.mp3
+          retention-days: 30
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Build paleo-play.exe and paleo-render.exe
+        shell: cmd
+        run: |
+          mkdir build\paleo
+          set SRC=paleo\engine\paleo.cpp paleo\faust\gen\taiko.cpp paleo\faust\gen\bigdrum.cpp paleo\faust\gen\logdrum.cpp paleo\faust\gen\rattle.cpp paleo\faust\gen\stone.cpp paleo\faust\gen\mouthbow.cpp paleo\faust\gen\horn.cpp paleo\faust\gen\pipe.cpp paleo\faust\gen\fiddle.cpp paleo\faust\gen\choir.cpp paleo\faust\gen\reverb.cpp paleo\faust\gen\boneflute.cpp paleo\faust\gen\panpipes.cpp paleo\faust\gen\bowedbone.cpp paleo\faust\gen\slitdrum.cpp paleo\faust\gen\claypot.cpp paleo\faust\gen\framedrum.cpp paleo\faust\gen\rasp.cpp paleo\faust\gen\bullroarer.cpp paleo\faust\gen\cbrecorder.cpp paleo\faust\gen\fujara.cpp paleo\faust\gen\uprightbass.cpp paleo\faust\gen\harmonium.cpp paleo\faust\gen\bugle.cpp paleo\faust\gen\guitar.cpp
+          cl /nologo /O2 /std:c++17 /EHsc /w /arch:AVX2 /Ipaleo /Fe:build\paleo\paleo-play.exe paleo\tools\play.cpp %SRC% || exit /b 1
+          cl /nologo /O2 /std:c++17 /EHsc /w /arch:AVX2 /Ipaleo /Fe:build\paleo\paleo-render.exe paleo\tools\render.cpp %SRC% || exit /b 1
+          copy paleo\scores\stampede.txt build\paleo\
+          copy paleo\scores\kit-demo.txt build\paleo\
+          copy paleo\scores\kit-demo2.txt build\paleo\
+          copy paleo\scores\creature-demo.txt build\paleo\
+          mkdir build\paleo\creatures
+          copy paleo\creatures\lib\* build\paleo\creatures\
+          copy paleo\creatures\CREDITS.md build\paleo\creatures\
+      - name: Smoke test (the creature library must load)
+        shell: cmd
+        run: |
+          build\paleo\paleo-render.exe build\paleo\stampede.txt build\paleo\test.wav --seconds 20 > build\log.txt 2>&1
+          type build\log.txt
+          findstr /C:"creature library: 126 calls" build\log.txt || exit /b 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: paleo-windows
+          path: |
+            build/paleo/paleo-play.exe
+            build/paleo/paleo-render.exe
+            build/paleo/stampede.txt
+            build/paleo/kit-demo.txt
+            build/paleo/kit-demo2.txt
+            build/paleo/creature-demo.txt
+            build/paleo/creatures/
+          retention-days: 30
