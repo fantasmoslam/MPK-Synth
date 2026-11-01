@@ -18,6 +18,7 @@ public final class Run {
     public void tick(long now,long dt,boolean audio){
         if(s.runPhase==UiState.RUNNING){
             if(audio&&dt>0)s.runElapsed+=dt;
+            s.expedition().tick(Math.max(0,dt),audio,s.runLength);
             if(s.runLength>0&&s.runElapsed>=s.runLength){s.runElapsed=s.runLength;end(now);}
         }else if(s.runPhase==UiState.ENDING&&(now-s.fadeStart>=FADE_MS||e.faded()))finish();
     }
@@ -45,6 +46,7 @@ public final class Run {
         Recorder r=e.recorder();if(r!=null&&r.state()==Recorder.RECORDING)r.stop();
         if(s.runPhase==UiState.ENDING)e.fade(0);
         s.runNumber++;s.runElapsed=0;s.runLength=s.nextRunLength;s.runPhase=UiState.RUNNING;s.endDismissed=false;
+        s.beginExpedition();
     }
     public static String lengthText(long ms){return ms==0?"Continuous":(ms/60000)+" min";}
 }

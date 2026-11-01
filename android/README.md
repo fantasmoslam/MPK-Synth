@@ -10,7 +10,7 @@ The APK carries native libraries for both `armeabi-v7a` (the SM-T510's 32-bit us
 `arm64-v8a` (64-bit tablets such as the Galaxy Tab S6 Lite SM-P610 on official LineageOS 23.2).
 The 64-bit build has not yet been accepted on a device.
 
-## Round-three interface (0.4.0, phases 1 to 3)
+## Round-three interface (0.4.0, phases 1 to 3 and 5)
 
 The signed-off round-three design (Focus by default, Performance switchable) is the whole
 app; the old firmware panel and four-tab workspace are gone. `java/org/paleotone/synth/ui/`
@@ -49,7 +49,31 @@ sh android/preview/render.sh build/preview
   on End run, the clock holds, the mix fades over five seconds (an active take records the fade),
   then the take saves and audio stops. Stop All or Stop now during the fade ends at once.
 - **Run end:** the closing card during the fade, then Run complete with the take's name and length,
-  or No recording.
+  or No recording, with a strip of the map below.
+- **Valley map (phase 5):** a flat top-down valley generated from the run's valley seed
+  (`ui/Valley.java`); no real geography is used. Seven terrain regions (forest, swamp, plains,
+  volcanic, desert, ridge, mangrove) with the design's glyph textures, a river, a lake and a pond,
+  sixteen stations along a route, two landmarks, herds and a predator, the travelled trail, the route
+  ahead and your position. `ui/ValleyMap.java` draws it at any zoom: terrain and creatures scale,
+  but every label is drawn at one fixed on-screen size (review amendment 1) and labels never overlap
+  (lower-priority names are left out where there is no room).
+- **Expedition:** status strip (valley, day and time, habitat, weather, station), Survey (opens the
+  map), Danger and Majesty (the same notes as INSTRUMENT), the encounter card or the expedition log,
+  and the eight actions. **Valley Survey** pans with one finger and zooms with a pinch; View tools has
+  Zoom, Centre on me and Whole valley; Plot a path adds points with each tap and draws your path in
+  amber until Clear path. **Encounter:** the eight stages (Signs to Coda) with the stage text, the
+  creature once identified, Conductor response and a position map.
+- **Journal:** base camp, each night camp and each identified encounter as a page in the leader's
+  hand, with a plate for the creature. **Bestiary:** 24 species in pages of 12, recorded ones named,
+  with Find species (group or name order) and Read first encounter. **Start:** choose the next run's
+  leader (Dr. Wellington / Cinematic, Miss Veronica / Lo-fi, Jonesy / Dark ambient), valley seed and
+  run length, then Begin expedition.
+
+The expedition itself is a seeded stand-in (`ui/Expedition.java`) until the conductor's expedition
+runs on the tablet: while the run clock counts it moves one station per fifteenth of the run (two
+minutes on Continuous) and raises encounters from a fixed catalogue; the actions answer simply (Move on
+goes to the next station, Observe and the others advance an encounter, Shelter and Defend end a
+dangerous one). The leader's sound flavour and the actions reach the conductor once it is ported.
 
 **The old DINOBOX Scape is switched off** (Dylan, 1 November 2026). Its habitat, drone, creature
 calls and loop music came from the FM-1 firmware and do not belong in the rebuild. The firmware still
@@ -61,13 +85,14 @@ sample layer are unaffected. The run clock therefore stays still for now.
 
 Knobs follow the review's zero rule: unipolar knobs sweep from 7 o'clock to 5 o'clock; only
 engine-marked bipolar parameters point to 12 at zero, with a centre tick. Not built yet: the
-notes are saved but not connected (their gauges show a dash, phase 4); the expedition, map,
-journal, bestiary and Start screens (phase 5).
+notes are saved but not connected (their gauges show a dash or IDLE, phase 4).
 
 Fonts (SIL OFL 1.1, licences in the APK's `assets/licenses`): Michroma, IBM Plex Mono,
 Caveat and IM FELL English. `android/tests/UiTest.java` checks the knob zero rule, both
 layouts on every screen at 1280 and 1333 units wide, dragging, layout switching, Stop All
-over sheets and quick mix, the dock, sound design edits, layer mutes, and the run timer and end.
+over sheets and quick mix, the dock, sound design edits, layer mutes, the run timer and end, the
+seeded valley (200 seeds), the stand-in expedition and journal, fixed-size map labels at two zooms,
+pinch, pan and path plotting, and a new run taking the chosen leader and seed.
 `android/tests/capture_test.c` checks the recording tap and the fade.
 
 ## Source baseline and scope

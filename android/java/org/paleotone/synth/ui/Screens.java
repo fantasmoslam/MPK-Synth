@@ -17,10 +17,12 @@ public final class Screens {
     private Gfx g;private float W,H;
     private String sheetTitle;private String[] sheetOptions;private int sheetSelected;private IntConsumer sheetPick;
 
-    public Screens(Ui ui,UiState state,Engine engine){this.ui=ui;s=state;e=engine;run=new Run(state,engine);}
+    private final FieldScreens field;
+    public Screens(Ui ui,UiState state,Engine engine){this.ui=ui;s=state;e=engine;run=new Run(state,engine);field=new FieldScreens(ui,state,this);}
 
     public void draw(){
         g=ui.g;W=ui.width;H=ui.height;
+        s.expedition(); // names the run from its valley before the header draws
         g.rect(0,0,W,H,Theme.BACKGROUND);
         header();
         boolean focus=s.layout==UiState.Layout.FOCUS;
@@ -30,11 +32,14 @@ public final class Screens {
             case INSTRUMENT:if(focus)instrumentFocus();else instrumentPerformance();break;
             case SETTINGS:settings(cx,cy,cw,ch);break;
             case RECORDING:recording(cx,cy,cw,ch);break;
-            case EXPEDITION:if(s.runPhase!=UiState.RUNNING&&!s.endDismissed)runEnd(cx,cy,cw,ch);else upcoming(cx,cy,cw,ch);break;
+            case EXPEDITION:if(s.runPhase!=UiState.RUNNING&&!s.endDismissed)runEnd(cx,cy,cw,ch);else field.expedition(cx,cy,cw,ch,focus);break;
+            case JOURNAL:field.journal(cx,cy,cw,ch,focus);break;
+            case BESTIARY:field.bestiary(cx,cy,cw,ch,focus);break;
+            case START:field.start(cx,cy,cw,ch,focus);break;
             case MIXER:mixer(cx,cy,cw,ch,focus);break;
             case SOUND_DESIGN:soundDesign(cx,cy,cw,ch,focus);break;
             case LIBRARY:library(cx,cy,cw,ch);break;
-            default:upcoming(cx,cy,cw,ch);
+            default:
         }
         if(s.quickMix)quickMix(cx,cy,cw,ch);
         if(runSheet)runLengthSheet(cx,cy,cw,ch);
@@ -97,7 +102,11 @@ public final class Screens {
             ui.button("nav."+n,17+i*(w+gap),634,w,53,n.label,on?Ui.SELECTED:Ui.NORMAL,true,()->go(n));
         }
     }
-    private void go(UiState.Screen n){s.screen=n;sheetOptions=null;s.quickMix=false;runSheet=false;}
+    void go(UiState.Screen n){
+        if(n==UiState.Screen.EXPEDITION&&s.screen==n){s.mapOpen=false;s.encounterOpen=false;s.plotting=false;}
+        s.screen=n;sheetOptions=null;s.quickMix=false;runSheet=false;
+    }
+    void goButton(String id,float x,float y,float w,float h,String label,final UiState.Screen n){ui.button(id,x,y,w,h,label,Ui.NORMAL,true,()->go(n));}
 
     // ---- INSTRUMENT --------------------------------------------------------------------
     private void instrumentFocus(){
@@ -621,8 +630,9 @@ public final class Screens {
     }
     /** The closing and run-complete card, on Expedition. */
     private void runEnd(float x,float y,float w,float h){
-        float cw=Math.min(820,w-40),ch=s.runPhase==UiState.ENDING?300:350,cx=x+(w-cw)/2,cy=y+(h-ch)/2-20;
+        float strip=Math.min(160,h-380-20),cw=Math.min(820,w-40),ch=(s.runPhase==UiState.ENDING?300:350)+strip+12,cx=x+(w-cw)/2,cy=y+(h-ch)/2;
         ui.panel(cx,cy,cw,ch);
+        field.mapStrip(cx+12,cy+ch-strip-12,cw-24,strip);
         float mid=cx+cw/2;
         g.text((s.runName+" / "+s.leader).toUpperCase(Locale.ROOT),mid,cy+30,Gfx.MONO,9.5f,Theme.MUTED,Gfx.CENTER,.06f);
         g.text(s.runPhase==UiState.ENDING?"The expedition is closing.":"Run complete.",mid,cy+80,Gfx.PRINT,36,Theme.TEXT,Gfx.CENTER,0);
@@ -659,27 +669,6 @@ public final class Screens {
     }
 
     // ---- other screens -------------------------------------------------------------------
-    private void upcoming(float x,float y,float w,float h){
-        ui.panel(x,y,w,h);
-        g.text(s.screen.label.toUpperCase(Locale.ROOT),x+24,y+44,Gfx.DISPLAY,20,Theme.PHOSPHOR,Gfx.LEFT,.02f);
-        String what;
-        switch(s.screen){
-            case EXPEDITION:what="The expedition, encounters and the valley survey map are built in phase 5.";break;
-            case JOURNAL:what="The field journal is built in phase 5.";break;
-            case BESTIARY:what="The bestiary is built in phase 5.";break;
-            case START:what="Choosing the leader and place for a new run is built in phase 5.";break;
-            default:what="";
-        }
-        g.text(what,x+24,y+80,Gfx.MONO,13,Theme.MUTED,Gfx.LEFT,0);
-        if(s.screen==UiState.Screen.START){
-            ui.button("start.length",x+24,y+110,220,50,"Run length: "+Run.lengthText(s.nextRunLength),Ui.NORMAL,true,this::openRunLength);
-            ui.button("start.new",x+256,y+110,200,50,"Start a new run",Ui.SELECTED,true,()->{run.newRun();go(UiState.Screen.INSTRUMENT);});
-            if(s.runPhase==UiState.RUNNING)ui.button("start.end",x+468,y+110,140,50,"End run",Ui.NORMAL,true,()->run.end(ui.now));
-            g.text("A new run starts the clock from zero with the chosen length. Earlier takes are kept.",x+24,y+190,Gfx.MONO,12,Theme.MUTED,Gfx.LEFT,0);
-        }
-        if(s.screen==UiState.Screen.EXPEDITION&&s.runPhase==UiState.ENDED)
-            ui.button("expedition.summary",x+24,y+110,200,50,"Run summary",Ui.NORMAL,true,()->s.endDismissed=false);
-    }
     private void settings(float x,float y,float w,float h){
         ui.panel(x,y,w,h);
         g.text("SETTINGS",x+24,y+44,Gfx.DISPLAY,20,Theme.PHOSPHOR,Gfx.LEFT,.02f);

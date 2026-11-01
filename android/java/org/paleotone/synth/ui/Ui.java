@@ -12,14 +12,20 @@ import java.util.function.IntConsumer;
  */
 public final class Ui {
     public interface Drag{void start(float x,float y);void move(float x,float y);void end();}
+    /**
+     * One or more fingers on a map: update gets the fingers' centre and spread (0 for one
+     * finger) whenever they move or a finger lands or lifts; end reports a tap when no
+     * finger moved.
+     */
+    public interface Pan{void update(float cx,float cy,float spread,int fingers);void end(boolean tap,float x,float y);}
     public static final int NORMAL=0,SELECTED=1,STOP=2,QUIET=3,RECORD=4;
 
     private static final class Hit{
-        final String id;final float x,y,w,h;final Runnable tap;final Drag drag;
+        final String id;final float x,y,w,h;final Runnable tap;final Drag drag;Pan pan;
         Hit(String id,float x,float y,float w,float h,Runnable tap,Drag drag){this.id=id;this.x=x;this.y=y;this.w=w;this.h=h;this.tap=tap;this.drag=drag;}
         boolean contains(float px,float py){return px>=x&&py>=y&&px<x+w&&py<y+h;}
     }
-    private static final class Pointer{Hit hit;float downX,downY;boolean moved;}
+    private static final class Pointer{Hit hit;float downX,downY,x,y;boolean moved;}
     /** A value you set recently; engine snapshots may lag behind it for a moment. */
     private static final class Pending{float value;long since;}
 
@@ -43,28 +49,49 @@ public final class Ui {
         Hit target=null;
         for(int i=hits.size()-1;i>=0;i--)if(hits.get(i).contains(x,y)){target=hits.get(i);break;}
         if(target==null)return;
-        for(Pointer p:pointers.values())if(p.hit.id.equals(target.id))return; // one finger per control
-        Pointer p=new Pointer();p.hit=target;p.downX=x;p.downY=y;pointers.put(id,p);
+        if(target.pan==null)for(Pointer p:pointers.values())if(p.hit.id.equals(target.id))return; // one finger per control
+        Pointer p=new Pointer();p.hit=target;p.downX=p.x=x;p.downY=p.y=y;pointers.put(id,p);
+        if(target.pan!=null){panMoved=pinchCount(target.id)>1;pan(target);}
         if(target.drag!=null)target.drag.start(x,y);
         dirty=true;
     }
     public void move(int id,float x,float y){
         Pointer p=pointers.get(id);if(p==null)return;
         if(Math.abs(x-p.downX)>8||Math.abs(y-p.downY)>8)p.moved=true;
+        p.x=x;p.y=y;
+        if(p.hit.pan!=null){if(p.moved)panMoved=true;pan(p.hit);}
         if(p.hit.drag!=null)p.hit.drag.move(x,y);
         dirty=true;
     }
     public void up(int id,float x,float y){
         Pointer p=pointers.remove(id);if(p==null)return;
+        if(p.hit.pan!=null){
+            if(pinchCount(p.hit.id)==0)p.hit.pan.end(!panMoved&&!p.moved,x,y);else pan(p.hit);
+            dirty=true;return;
+        }
         if(p.hit.drag!=null)p.hit.drag.end();
         else if(p.hit.tap!=null&&p.hit.contains(x,y))p.hit.tap.run();
         dirty=true;
     }
-    public void cancel(){for(Pointer p:pointers.values())if(p.hit.drag!=null)p.hit.drag.end();pointers.clear();dirty=true;}
+    public void cancel(){
+        for(Pointer p:pointers.values()){if(p.hit.drag!=null)p.hit.drag.end();if(p.hit.pan!=null)p.hit.pan.end(false,p.x,p.y);}
+        pointers.clear();dirty=true;
+    }
+    private boolean panMoved;
+    private int pinchCount(String hitId){int n=0;for(Pointer p:pointers.values())if(p.hit.id.equals(hitId))n++;return n;}
+    private void pan(Hit h){
+        float cx=0,cy=0;int n=0;
+        for(Pointer p:pointers.values())if(p.hit.id.equals(h.id)){cx+=p.x;cy+=p.y;n++;}
+        if(n==0)return;cx/=n;cy/=n;
+        float spread=0;
+        if(n>1)for(Pointer p:pointers.values())if(p.hit.id.equals(h.id))spread+=(float)Math.hypot(p.x-cx,p.y-cy);
+        h.pan.update(cx,cy,n>1?spread/n:0,n);
+    }
     public boolean held(String id){for(Pointer p:pointers.values())if(p.hit.id.equals(id))return true;return false;}
 
     public void hit(String id,float x,float y,float w,float h,Runnable tap){building.add(new Hit(id,x,y,w,h,tap,null));}
     public void hitDrag(String id,float x,float y,float w,float h,Drag drag){building.add(new Hit(id,x,y,w,h,null,drag));}
+    public void hitPan(String id,float x,float y,float w,float h,Pan pan){Hit t=new Hit(id,x,y,w,h,null,null);t.pan=pan;building.add(t);}
     /** Swallows touches under an overlay. */
     public void block(float x,float y,float w,float h){building.add(new Hit("block@"+x+","+y,x,y,w,h,()->{},null));}
 
