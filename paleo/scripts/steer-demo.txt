@@ -1,0 +1,14 @@
+# A player steering the expedition, for the reactive preview. TIME (m:ss) then what they did.
+0:45 action OBSERVE
+1:25 action INTERACT
+1:50 action MOVE_ON
+2:30 note Danger 80
+2:45 action TRACK
+3:30 action DEFEND
+4:15 action SHELTER
+5:00 note Danger 30
+5:00 note Majesty 85
+5:15 action FOLLOW_HERD
+6:10 note Pace 70
+6:40 action WAIT
+7:30 stop

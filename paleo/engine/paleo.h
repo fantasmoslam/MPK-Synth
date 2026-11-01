@@ -19,7 +19,7 @@ namespace paleo {
 struct Event { double t = 0, d = 0; std::string part; int midi = 0; float vel = 0; float p1 = -1, p2 = -9; /* optional 6th, 7th columns */ };
 std::vector<Event> read_score(const char* path);
 
-enum class Lead { horn, fiddle, choir, blend };
+enum class Lead { horn, fiddle, choir, blend, all };   /* all: every lead part on, "lead" plays the fiddle (the live conductor names parts itself) */
 enum class Ostinato { spiccato, mouthbow, both };
 struct Options { int sample_rate = 48000; int threads = 0; /* 0 = all but one core */ Lead lead = Lead::fiddle;
                  Ostinato ostinato = Ostinato::spiccato; };
@@ -38,6 +38,17 @@ class Engine {
   void set_stem(std::vector<float> dryL, std::vector<float> dryR, std::vector<float> sendL, std::vector<float> sendR);
   /* Render the next `frames` (any count) into L and R. Output is the song's level before final loudness. */
   void render(float* L, float* R, int frames);
+
+  /* ---- Live use (the conductor). Events are queued while the engine plays: one thread may call these while
+     another calls render(). Times are seconds on the engine clock (seconds()); a time already past plays at once.
+     Nothing here blocks render(): it takes the queue only if it is free, otherwise next block. */
+  void push(const Event& e);                       /* a note, a creature call, "subdrop" (vel = level) */
+  int hold(const Event& e);                        /* a note with no end yet (e.d ignored); returns its handle */
+  void release(int handle, double t);              /* that note ends at t */
+  void cancel_from(double t);                      /* drop every queued note, call and shot that starts at or after t */
+  /* A riser into a hit at t_hit: a chord on root_midi through the hall, reversed, swelling for secs (peak = level).
+     Built here, on the calling thread. */
+  void push_riser(double t_hit, double secs, float level, int root_midi);
   double seconds() const;
   double length() const;              /* end of the last event plus its ring-out */
   int threads() const;

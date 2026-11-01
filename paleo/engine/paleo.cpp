@@ -109,9 +109,9 @@ struct Voice {
   dsp* d = nullptr; Params p;
   bool active = false;
   long long start = 0, end = 0;      /* in frames */
-  double dur = 0, pre = 0; float vel = 0; int midi = 0; int idx = 0; float ens_div = 1; float p1 = -1;
+  double dur = 0, pre = 0; float vel = 0; int midi = 0; int idx = 0; float ens_div = 1; float p1 = -1; int handle = 0;
 };
-struct Pending { long long start; int part; double dur, pre; float vel, freq; int midi, idx; float ens_div; float p1 = -1; };
+struct Pending { long long start; int part; double dur, pre; float vel, freq; int midi, idx; float ens_div; float p1 = -1; int handle = 0; };
 
 struct Part {
   const PartDef* def; std::vector<Voice> v; std::vector<int> act; int notes = 0; bool on = true;
@@ -234,6 +234,7 @@ struct Engine::Impl {
     if (o.lead == Lead::fiddle) { off("horn"); off("choir"); }
     if (o.lead == Lead::choir) { off("horn"); off("fiddle"); }
     if (o.lead == Lead::blend) off("horn");
+    pend.reserve(1 << 14); cpend.reserve(1 << 12); cvoices.reserve(256); shots.reserve(64); inbox.reserve(4096); work.reserve(4096);
     int maxt = 0; for (auto& P : parts) maxt += (P.def->max_voices + kTaskVoices - 1) / kTaskVoices;
     tasks.resize(maxt);
     hall.init(sr, 3.4f, 4500, 1); room.init(sr, 1.1f, 6000, 1); tailr.init(sr, 9.0f, 3200, 1);
@@ -278,22 +279,38 @@ struct Engine::Impl {
     c.wide = wide; cpend.push_back(c);
     len = std::max(len, e.t + double(vars[k].size()) / 48000.0 / pow(2.0, semi / 12.0) + 1);
   }
+  int notes[kNumParts] = {};
+  /* One note of a part into the queue (its ensemble voices, each slightly late and detuned). */
+  void add_note(int pi, const Event& e, int handle) {
+    const PartDef& D = kParts[pi];
+    int ens = D.ens;
+    for (int v = 0; v < ens; v++) {
+      bool sp = D.ctl == Ctl::spiccato, ld = D.ctl == Ctl::lead;
+      double lag = sp ? .004 * v : ld ? .012 * v : 0, pre = sp ? .07 : 0;
+      double det = ens > 1 ? D.cents * (2.0 * v / (ens - 1) - 1) : 0;
+      Pending p; p.start = (long long)(std::max(0.0, e.t + lag - pre) * sr); p.part = pi; p.dur = e.d; p.pre = pre;
+      p.vel = e.vel; p.midi = e.midi; p.freq = float(440 * pow(2, (e.midi - 69) / 12.0) * pow(2, det / 1200));
+      p.idx = notes[pi]++; p.ens_div = float(ens); p.p1 = e.p1; p.handle = handle; pend.push_back(p);
+    }
+    len = std::max(len, e.t + e.d + D.ring + 1);
+  }
+  /* Where a score part goes: "lead" and "ostinato" follow the options; returns the parts (up to 2). */
+  int route(const std::string& name, int out[2]) const {
+    int n = 0;
+    if (name == "lead") {
+      if (o.lead == Lead::horn) out[n++] = part_of("horn");
+      if (o.lead == Lead::fiddle || o.lead == Lead::blend || o.lead == Lead::all) out[n++] = part_of("fiddle");
+      if (o.lead == Lead::choir || o.lead == Lead::blend) out[n++] = part_of("choir");
+    } else if (name == "ostinato") {
+      if (o.ostinato != Ostinato::mouthbow) out[n++] = part_of("spiccato");
+      if (o.ostinato != Ostinato::spiccato) out[n++] = part_of("mouthbow");
+    } else { int pi = part_of(name); if (pi >= 0) out[n++] = pi; }
+    return n;
+  }
   void schedule(const std::vector<Event>& score) {
     pend.clear(); shots.clear(); len = 0; cpend.clear(); cvoices.clear(); last_var.clear(); int ncre = 0;
-    std::vector<int> notes(kNumParts, 0);
-    auto add = [&](int pi, const Event& e) {
-      const PartDef& D = kParts[pi];
-      int ens = D.ens;
-      for (int v = 0; v < ens; v++) {
-        bool sp = D.ctl == Ctl::spiccato, ld = D.ctl == Ctl::lead;
-        double lag = sp ? .004 * v : ld ? .012 * v : 0, pre = sp ? .07 : 0;
-        double det = ens > 1 ? D.cents * (2.0 * v / (ens - 1) - 1) : 0;
-        Pending p; p.start = (long long)(std::max(0.0, e.t + lag - pre) * sr); p.part = pi; p.dur = e.d; p.pre = pre;
-        p.vel = e.vel; p.midi = e.midi; p.freq = float(440 * pow(2, (e.midi - 69) / 12.0) * pow(2, det / 1200));
-        p.idx = notes[pi]++; p.ens_div = float(ens); p.p1 = e.p1; pend.push_back(p);
-      }
-      len = std::max(len, e.t + e.d + D.ring + 1);
-    };
+    for (auto& c : notes) c = 0;
+    auto add = [&](int pi, const Event& e) { add_note(pi, e, 0); };
     for (auto& e : score) {
       if (e.part == "lead") {
         if (o.lead == Lead::horn) add(part_of("horn"), e);
@@ -337,7 +354,7 @@ struct Engine::Impl {
     if (D.ctl == Ctl::horn) Params::set(v.p.p1, 3.3f);
     if (q.p1 >= 0) Params::set(v.p.p1, q.p1);   /* the score's own p1 (e.g. where a frame drum is hit) */
     v.active = true; v.start = q.start; v.dur = q.dur; v.pre = q.pre; v.vel = q.vel; v.midi = q.midi; v.idx = q.idx;
-    v.ens_div = q.ens_div; v.end = q.start + (long long)((q.dur + D.ring) * sr);
+    v.ens_div = q.ens_div; v.handle = q.handle; v.end = q.start + (long long)((q.dur + D.ring) * sr);
     P.act.push_back(slot);
   }
 
@@ -385,7 +402,41 @@ struct Engine::Impl {
     }
   }
 
+  /* ---- live queue */
+  struct Op { int kind = 0; Event e; int handle = 0; double t = 0; Shot shot; };   /* 0 note, 1 hold, 2 release, 3 cancel, 4 shot */
+  std::mutex inbox_m; std::vector<Op> inbox, work; int ncre_live = 100000;
+  void drain() {
+    { std::unique_lock<std::mutex> l(inbox_m, std::try_to_lock); if (!l.owns_lock() || inbox.empty()) return; std::swap(inbox, work); }
+    bool np = false, nc = false;
+    for (auto& op : work) {
+      if (op.kind == 0 || op.kind == 1) {
+        if (lib.count(op.e.part)) { add_creature(op.e, ncre_live++); nc = true; continue; }
+        int r[2]; int k = route(op.e.part, r);
+        for (int i = 0; i < k; i++) { add_note(r[i], op.e, op.handle); np = true; }
+      } else if (op.kind == 2) {
+        long long te = (long long)(op.t * sr);
+        for (size_t i = pend_i; i < pend.size(); i++) if (pend[i].handle == op.handle) pend[i].dur = std::max(0.0, double(te - pend[i].start) / sr);
+        for (auto& P : parts) for (int a : P.act) { Voice& v = P.v[a]; if (v.handle == op.handle) {
+          v.dur = std::max(0.0, double(te - v.start) / sr); v.end = v.start + (long long)((v.dur + P.def->ring) * sr); v.handle = 0; } }
+      } else if (op.kind == 3) {
+        long long tc = (long long)(op.t * sr);
+        pend.erase(std::remove_if(pend.begin() + long(pend_i), pend.end(), [&](const Pending& q) { return q.start >= tc; }), pend.end());
+        cpend.erase(std::remove_if(cpend.begin() + long(cpend_i), cpend.end(), [&](const CEvent& q) { return q.start >= tc; }), cpend.end());
+        shots.erase(std::remove_if(shots.begin(), shots.end(), [&](const Shot& q) { return q.start >= tc; }), shots.end());
+      } else if (op.kind == 4) shots.push_back(std::move(op.shot));
+    }
+    work.clear();
+    if (np) std::stable_sort(pend.begin() + long(pend_i), pend.end(), [](const Pending& a, const Pending& b) { return a.start < b.start; });
+    if (nc) std::stable_sort(cpend.begin() + long(cpend_i), cpend.end(), [](const CEvent& a, const CEvent& b) { return a.start < b.start; });
+    if (pend_i > 4096) { pend.erase(pend.begin(), pend.begin() + long(pend_i)); pend_i = 0; }
+    if (cpend_i > 1024) { cpend.erase(cpend.begin(), cpend.begin() + long(cpend_i)); cpend_i = 0; }
+  }
+  void post(Op&& op) { std::lock_guard<std::mutex> l(inbox_m); inbox.push_back(std::move(op)); }
+  int next_handle = 1;
+  dsp* riser_rv = nullptr; Params riser_p; float riser_g = 1;
+
   void render_block(float* L, float* R, int n) {
+    drain();
     blk_t = t; blk_n = n;
     while (pend_i < pend.size() && pend[pend_i].start < t + n) start_voice(pend[pend_i++]);
     ntasks = 0;
@@ -401,6 +452,7 @@ struct Engine::Impl {
     }
     mix(L, R, n);
     t += n;
+    for (size_t i = 0; i < shots.size();) { if (shots[i].start + (long long)shots[i].L.size() <= t) { shots[i] = std::move(shots.back()); shots.pop_back(); } else i++; }
   }
 
   float hinL[kMaxBlock], hinR[kMaxBlock], rinL[kMaxBlock], rinR[kMaxBlock], tinL[kMaxBlock], tinR[kMaxBlock];
@@ -497,7 +549,7 @@ struct Engine::Impl {
 Engine::Engine(const Options& o) : p(new Impl) { flush_denormals(); p->o = o; p->init(); }
 Engine::~Engine() {
   for (auto& P : p->parts) for (auto& v : P.v) delete v.d;
-  delete p->hall.d; delete p->room.d; delete p->tailr.d; delete p;
+  delete p->hall.d; delete p->room.d; delete p->tailr.d; delete p->riser_rv; delete p;
 }
 void Engine::load(const std::vector<Event>& score) {
   flush_denormals();
@@ -521,6 +573,42 @@ double Engine::length() const { return p->len; }
 int Engine::threads() const { return int(p->pool.th.size()) + 1; }
 double Engine::last_load() const { return p->load; }
 int Engine::active_voices() const { int n = 0; for (auto& P : p->parts) n += int(P.act.size()); return n; }
+
+void Engine::push(const Event& e) {
+  if (e.part == "subdrop") {
+    Impl::Op op; op.kind = 4; Impl::Shot& s = op.shot; int sr = p->sr; s.start = (long long)(e.t * sr); int n = int(1.8 * sr); s.L.resize(n); double ph = 0;
+    for (int i = 0; i < n; i++) { double tt = double(i) / sr, f = 60 * exp(-tt * 1.2) + 28; ph += 2 * 3.14159265358979 * f / sr; s.L[i] = float(sin(ph) * exp(-tt * 2.2) * e.vel); }
+    s.R = s.L; p->post(std::move(op)); return;
+  }
+  Impl::Op op; op.kind = 0; op.e = e; p->post(std::move(op));
+}
+int Engine::hold(const Event& e) {
+  Impl::Op op; op.kind = 1; op.e = e; op.e.d = 1e6; int h; { std::lock_guard<std::mutex> l(p->inbox_m); h = p->next_handle++; }
+  op.handle = h; p->post(std::move(op)); return h;
+}
+void Engine::release(int handle, double t) { Impl::Op op; op.kind = 2; op.handle = handle; op.t = t; p->post(std::move(op)); }
+void Engine::cancel_from(double t) { Impl::Op op; op.kind = 3; op.t = t; p->post(std::move(op)); }
+void Engine::push_riser(double t_hit, double secs, float level, int root) {
+  int sr = p->sr;
+  if (!p->riser_rv) { p->riser_rv = make_reverb(); p->riser_rv->init(sr); p->riser_rv->buildUserInterface(&p->riser_p);
+                      Params::set(p->riser_p.rt60, 3.4f); Params::set(p->riser_p.dark, 4500); }
+  p->riser_rv->instanceClear();
+  int n = int(secs * sr), seg = int(1.2 * sr); std::vector<float> in(n, 0.f), in2, oL(n), oR(n); uint32_t z = 77u + uint32_t(root) * 131u;
+  const int iv[4] = {0, 7, 12, 19};
+  for (int i = 0; i < std::min(seg, n); i++) {      /* a bright chord with a breath of noise, dying over 1.2 s */
+    double tt = double(i) / sr, env = exp(-tt * 2.5) * std::min(1.0, tt / .01), x = 0;
+    for (int k = 0; k < 4; k++) { double f = 440 * pow(2, (root + 12 + iv[k] - 69) / 12.0);
+      for (int h = 1; h <= 6; h++) x += sin(2 * 3.14159265358979 * f * h * tt * (1 + .002 * k)) / h * .25; }
+    z = z * 1664525u + 1013904223u; x += (int32_t(z) >> 8) / 8388608.0 * .3;
+    in[i] = float(x * env);
+  }
+  in2 = in; float* ins[2] = {in.data(), in2.data()}; float* outs[2] = {oL.data(), oR.data()};
+  for (int a = 0; a < n; a += 1024) { int m = std::min(1024, n - a); float* i2[2] = {ins[0] + a, ins[1] + a}; float* o2[2] = {outs[0] + a, outs[1] + a}; p->riser_rv->compute(m, i2, o2); }
+  Impl::Op op; op.kind = 4; Impl::Shot& s = op.shot; s.L.resize(n); s.R.resize(n); float pk = 1e-9f;
+  for (int i = 0; i < n; i++) { float ramp = float(i) / (n - 1); ramp *= ramp; s.L[i] = oL[n - 1 - i] * ramp; s.R[i] = oR[n - 1 - i] * ramp; pk = std::max(pk, std::max(fabsf(s.L[i]), fabsf(s.R[i]))); }
+  for (int i = 0; i < n; i++) { s.L[i] *= level / pk; s.R[i] *= level / pk; }
+  s.start = (long long)(t_hit * sr) - n; p->post(std::move(op));
+}
 
 std::vector<Event> read_score(const char* path) {
   std::vector<Event> out; std::ifstream f(path); std::string line;
