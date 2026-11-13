@@ -1,0 +1,112 @@
+In file included from firmware/src/felucca.c:80:
+In file included from firmware/src/fx.c:224:
+firmware/src/scape.c:409:99: warning: shifting a negative signed value is undefined [-Wshift-negative-value]
+        sc.wc[k] = clamp(sc.wc[k] + (int32_t)(noise32(&sc.rng) >> 25) - 64 - (sc.wc[k] >> 11), -6 << 8, 6 << 8);
+                                                                                               ~~ ^
+In file included from firmware/src/felucca.c:93:
+In file included from firmware/src/ui.c:1587:
+firmware/src/dream.c:14:57: warning: passing 'uint32_t *' (aka 'unsigned int *') to parameter of type 'int32_t *' (aka 'int *') converts between pointers to integer types with different sign [-Wpointer-sign]
+static uint32_t dr_rnd(uint32_t n) { return n ? noise32(&dream.seed)%n : 0; }
+                                                        ^~~~~~~~~~~
+firmware/src/dsp.c:75:41: note: passing argument to parameter 'st' here
+static inline uint32_t noise32(int32_t *st)
+                                        ^
+In file included from firmware/src/felucca.c:93:
+In file included from firmware/src/ui.c:1587:
+firmware/src/dream.c:124:63: warning: for loop has empty body [-Wempty-body]
+    uint32_t k,i,j,any=0;for(k=0;k<27 && !((notes>>k)&1u);k++);if(k==27)return;
+                                                              ^
+firmware/src/dream.c:124:63: note: put the semicolon on a separate line to silence this warning
+3 warnings generated.
+size: 953 main-loop functions built for size (7 not in this build; 123 reached from an interrupt kept -Os)
+face S: ShareTechMono-Regular.ttf 13px h18 base13  105 glyphs x 1  data 2076 B + table 840 B + kern 0 B (0 pairs) = 2926 B   digit adv 7.00px
+face M: ShareTechMono-Regular.ttf 15px h20 base15  105 glyphs x 1  data 1007 B + table 840 B + kern 0 B (0 pairs) = 1857 B   digit adv 8.00px
+face L: ShareTechMono-Regular.ttf 29px h37 base28  41 glyphs x 1  data 1027 B + table 328 B + kern 0 B (0 pairs) = 1395 B   digit adv 16.00px
+fonts total 6178 B  -> /__w/MPK-Synth/MPK-Synth/build/gen/ui_fonts.h
+2 extra bytes in post.stringData array
+2 extra bytes in post.stringData array
+icons: x_oct_up: symbol_pitch_up not in the font yet, using control_arrow_up
+icons: x_oct_dn: symbol_pitch_down not in the font yet, using control_arrow_down
+icons 12px: 107 cells, 4339 B
+icons 16px: 41 cells, 2757 B
+icons 24px: 6 cells, 681 B
+icons code: 57 B
+icons total 7834 B -> /__w/MPK-Synth/MPK-Synth/build/gen/ui_icons.h   (87 legacy names + 38 new)
+keycaps: 27 pills, data 2164 B + tables 246 B; knob arcs 584 B = 2994 B -> /__w/MPK-Synth/MPK-Synth/build/gen/ui_keycaps.h
+fm6 patches: 15 -> /__w/MPK-Synth/MPK-Synth/build/gen/felucca_fm6.h
+loader: image 8152 B at 0x1c0a800, bss end 0x1c0f510
+loader: ota.bin 6942 B
+generated waves into /__w/MPK-Synth/MPK-Synth/build/genwav
+samples: 9 sets, 25 zones, 213018 B ADPCM, SLICE BREAK 44100 samples, SLICE PIANO (own copy) 16537 samples
+ghoulbox art: GB_LOGO 224 x 34, 500 B (3808 B as nibbles)
+ghoulbox art: GB_LOGO_S 176 x 28, 381 B (2464 B as nibbles)
+ghoulbox art: GB_SKULL 110 x 60, 1001 B (3300 B as nibbles)
+ghoulbox art: 1945 B -> /__w/MPK-Synth/MPK-Synth/build/gen/ghoulbox_art.h
+CPU1 idle loop: 50 instructions, only indirect job calls
+  ok    .ram_text: 916 insns, no calls
+  ok    image 549732 B; RAM .data+.bss 96184 B of 98304; pool 332900 B of 344064
+  ok    register access: hal/ only (src/, loader/ clean)
+app      /__w/MPK-Synth/MPK-Synth/build/felucca.bin  549732 B
+loader   /__w/MPK-Synth/MPK-Synth/build/loader/ota.bin  6942 B
+package  /__w/MPK-Synth/MPK-Synth/build/felucca.fwsc  610098 B, identity FM-1_900
+e58d5064eb841edda4a265d455c5dd365c9ba597cdcfa35869eccfb872eb9cb1  paleotone.fwsc
+ota test passed
+loader test passed
+target: analog_render     194 instructions,  102 in loops, 0 divides, 14 calls there: cost   102 (budget 585) note: -83 % (BUDGET_UPDATE=1 to keep it)
+target: phase_render      171 instructions,   53 in loops, 0 divides,  4 calls there: cost    53 (budget 79) note: -33 % (BUDGET_UPDATE=1 to keep it)
+target: lofi_render       281 instructions,  111 in loops, 0 divides,  2 calls there: cost   111 (budget 123) ok
+target: sample_render     154 instructions,   61 in loops, 0 divides,  3 calls there: cost   100 (budget 126) note: -21 % (BUDGET_UPDATE=1 to keep it)
+target: formant_render    500 instructions,  192 in loops, 0 divides,  6 calls there: cost   192 (budget 314) note: -39 % (BUDGET_UPDATE=1 to keep it)
+target: trio_render       483 instructions,  177 in loops, 0 divides, 16 calls there: cost   177 (budget 341) note: -48 % (BUDGET_UPDATE=1 to keep it)
+target: trio_pass         174 instructions,  104 in loops, 0 divides, 10 calls there: cost   104 (budget 175) note: -41 % (BUDGET_UPDATE=1 to keep it)
+target: wheel_render      243 instructions,  150 in loops, 0 divides,  3 calls there: cost   237 (budget 267) note: -11 % (BUDGET_UPDATE=1 to keep it)
+target: wheel_block       154 instructions,   71 in loops, 0 divides,  3 calls there: cost    71 (budget 102) note: -30 % (BUDGET_UPDATE=1 to keep it)
+target: grain_render      586 instructions,  218 in loops, 1 divides,  5 calls there: cost  1123 (budget 1731) note: -35 % (BUDGET_UPDATE=1 to keep it)
+target: grain_block       195 instructions,   86 in loops, 1 divides,  3 calls there: cost    94 (budget 139) note: -32 % (BUDGET_UPDATE=1 to keep it)
+target: phys_render       236 instructions,   39 in loops, 0 divides,  4 calls there: cost    39 (budget 61) note: -36 % (BUDGET_UPDATE=1 to keep it)
+target: drum_render      1396 instructions,   36 in loops, 0 divides,  3 calls there: cost    36 (budget 86) note: -58 % (BUDGET_UPDATE=1 to keep it)
+target: noise_render      471 instructions,  191 in loops, 0 divides,  3 calls there: cost   191 (budget 259) note: -26 % (BUDGET_UPDATE=1 to keep it)
+target: fm6_render        448 instructions,  240 in loops, 0 divides,  8 calls there: cost   309 (budget 372) note: -17 % (BUDGET_UPDATE=1 to keep it)
+target: fm6_op_run         69 instructions,   42 in loops, 0 divides,  4 calls there: cost    42 (budget 72) note: -42 % (BUDGET_UPDATE=1 to keep it)
+target: fm6_op_fb          36 instructions,   17 in loops, 0 divides,  1 calls there: cost    17 (budget 26) note: -35 % (BUDGET_UPDATE=1 to keep it)
+target: px_modal_block    208 instructions,   96 in loops, 0 divides,  4 calls there: cost    96 (budget 111) note: -14 % (BUDGET_UPDATE=1 to keep it)
+target: px_modal_run      195 instructions,  113 in loops, 0 divides,  6 calls there: cost   194 (budget 192) ok
+target: px_memb_block     205 instructions,  100 in loops, 0 divides,  6 calls there: cost   100 (budget 106) ok
+target: px_string_excite   135 instructions,  105 in loops, 0 divides,  5 calls there: cost   105 (budget 171) note: -39 % (BUDGET_UPDATE=1 to keep it)
+target: px_string_run     226 instructions,  166 in loops, 0 divides, 11 calls there: cost   166 (budget 264) note: -37 % (BUDGET_UPDATE=1 to keep it)
+target: px_symp_run       183 instructions,  115 in loops, 0 divides,  1 calls there: cost   262 (budget 252) ok
+target: dv_metal_run       42 instructions,   27 in loops, 0 divides,  0 calls there: cost    27 (budget 26) ok
+target: dv_kick_run       139 instructions,   78 in loops, 0 divides,  6 calls there: cost    78 (budget 153) note: -49 % (BUDGET_UPDATE=1 to keep it)
+target: dv_snare_run      138 instructions,   86 in loops, 0 divides,  5 calls there: cost    86 (budget 158) note: -46 % (BUDGET_UPDATE=1 to keep it)
+target: dv_clap_run        93 instructions,   42 in loops, 0 divides,  2 calls there: cost    42 (budget 74) note: -43 % (BUDGET_UPDATE=1 to keep it)
+target: dv_hat_run         84 instructions,   40 in loops, 0 divides,  1 calls there: cost    40 (budget 61) note: -34 % (BUDGET_UPDATE=1 to keep it)
+target: dv_tom_run         73 instructions,   43 in loops, 0 divides,  3 calls there: cost    43 (budget 75) note: -43 % (BUDGET_UPDATE=1 to keep it)
+target: dv_rim_run         47 instructions,   30 in loops, 0 divides,  3 calls there: cost    30 (budget 61) note: -51 % (BUDGET_UPDATE=1 to keep it)
+target: dv_bell_run        61 instructions,   31 in loops, 0 divides,  1 calls there: cost    31 (budget 52) note: -40 % (BUDGET_UPDATE=1 to keep it)
+target: dv_cym_run         74 instructions,   33 in loops, 0 divides,  2 calls there: cost    33 (budget 67) note: -51 % (BUDGET_UPDATE=1 to keep it)
+target: dv_out             27 instructions,   20 in loops, 0 divides,  1 calls there: cost    20 (budget 35) note: -43 % (BUDGET_UPDATE=1 to keep it)
+target: dv_metal_mix       19 instructions,   11 in loops, 0 divides,  1 calls there: cost    11 (budget 16) note: -31 % (BUDGET_UPDATE=1 to keep it)
+target: slice_render      215 instructions,   55 in loops, 0 divides,  3 calls there: cost   232 (budget 453) note: -49 % (BUDGET_UPDATE=1 to keep it)
+target: slc_rev            87 instructions,   17 in loops, 0 divides,  2 calls there: cost    17 (budget 120) note: -86 % (BUDGET_UPDATE=1 to keep it)
+target: fm1_alnk0_irq     211 instructions,  112 in loops, 0 divides,  9 calls there: cost   271 (budget 41327) note: -99 % (BUDGET_UPDATE=1 to keep it)
+target: fm1_timer5_irq    450 instructions,  102 in loops, 0 divides,  2 calls there: cost   102 (budget 618) note: -83 % (BUDGET_UPDATE=1 to keep it)
+target: usb_poll          876 instructions,  693 in loops, 0 divides, 64 calls there: cost 21060 (budget 26037) note: -19 % (BUDGET_UPDATE=1 to keep it)
+target: fm1__frame        137 instructions,  126 in loops, 1 divides,  0 calls there: cost   134 (budget 134) ok
+target: fm1__keys          82 instructions,   69 in loops, 0 divides,  0 calls there: cost   204 (budget 204) ok
+target: click_render       79 instructions,   30 in loops, 0 divides,  0 calls there: cost    30 (budget 30) ok
+target: mod_begin         213 instructions,  151 in loops, 0 divides,  3 calls there: cost   163 (budget 158) ok
+target: mod_voice         108 instructions,   28 in loops, 0 divides,  2 calls there: cost    28 (budget 30) ok
+target: mod_end            22 instructions,    6 in loops, 0 divides,  0 calls there: cost     6 (budget 7) note: -14 % (BUDGET_UPDATE=1 to keep it)
+target: perf_begin        190 instructions,   28 in loops, 0 divides,  0 calls there: cost    28 (budget 28) ok
+target: perf_mute          31 instructions,   14 in loops, 0 divides,  1 calls there: cost    14 (budget 21) note: -33 % (BUDGET_UPDATE=1 to keep it)
+target: perf_pre           34 instructions,   22 in loops, 0 divides,  1 calls there: cost    22 (budget 27) note: -19 % (BUDGET_UPDATE=1 to keep it)
+target: perf_block        466 instructions,  404 in loops, 0 divides, 24 calls there: cost   404 (budget 814) note: -50 % (BUDGET_UPDATE=1 to keep it)
+target: perf_master        58 instructions,   38 in loops, 0 divides,  1 calls there: cost    38 (budget 36) ok
+target: perf_flanger      118 instructions,   81 in loops, 0 divides,  4 calls there: cost   228 (budget 368) note: -38 % (BUDGET_UPDATE=1 to keep it)
+target: perf_phaser       110 instructions,   70 in loops, 0 divides,  2 calls there: cost   388 (budget 448) note: -13 % (BUDGET_UPDATE=1 to keep it)
+target: rev_room           85 instructions,   68 in loops, 0 divides,  0 calls there: cost   218 (budget 218) ok
+target: rev_spring        163 instructions,   90 in loops, 0 divides,  0 calls there: cost   126 (budget 126) ok
+target: rev_hall          302 instructions,  204 in loops, 0 divides,  8 calls there: cost   204 (budget 345) note: -41 % (BUDGET_UPDATE=1 to keep it)
+target: tape_block        227 instructions,  120 in loops, 0 divides,  2 calls there: cost   366 (budget 436) note: -16 % (BUDGET_UPDATE=1 to keep it)
+target: gurdy_render      748 instructions,  315 in loops, 1 divides,  8 calls there: cost   323 (budget 548) note: -41 % (BUDGET_UPDATE=1 to keep it)
+target: saurus_render     798 instructions,  649 in loops, 1 divides, 14 calls there: cost  1407 (budget 1757) note: -20 % (BUDGET_UPDATE=1 to keep it)
