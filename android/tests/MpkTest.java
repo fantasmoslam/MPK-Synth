@@ -82,8 +82,14 @@ public final class MpkTest {
         check(fe.recorder.state==Recorder.RECORDING,"Record starts a take");
         screens.mpkTransport(MpkRouter.Transport.RECORD,0);
         check(fe.recorder.state==Recorder.SAVED&&fe.recorder.stops==1,"Record again stops it");
+        // Stop ends the music and the take but leaves audio on, so the keys keep sounding (Dylan's tablet test:
+        // STOP ALL here turned audio off and the keys went silent until Record started it again).
+        screens.mpkTransport(MpkRouter.Transport.RECORD,0);
+        int scapes=fe.scapeCommands;
         screens.mpkTransport(MpkRouter.Transport.STOP,0);
-        check(fe.stopped,"Stop is STOP ALL");
+        check(!fe.stopped,"Stop is not STOP ALL");
+        check(fe.recorder.state==Recorder.SAVED&&fe.recorder.stops==2,"Stop ends the take");
+        check(fe.scapeCommands==scapes+1&&state.notice.contains("music and recording stopped"),"Stop ends the music: "+state.notice);
         // The pads part is saved with the interface.
         state.padPart=1;UiState again=new UiState();again.load(state.save());
         check(again.padPart==1,"pads part saved");

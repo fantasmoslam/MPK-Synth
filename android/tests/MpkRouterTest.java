@@ -8,6 +8,7 @@ import java.util.List;
 public final class MpkRouterTest {
     static void check(boolean ok,String what){if(!ok)throw new AssertionError(what);}
     static final List<String> sent=new ArrayList<>(),controls=new ArrayList<>();
+    static int played;
     static String m(int s,int a,int b){return String.format("%02X %d %d",s,a,b);}
     static void expect(String what,String... messages){
         check(sent.equals(List.of(messages)),what+": "+sent);sent.clear();
@@ -17,12 +18,14 @@ public final class MpkRouterTest {
         MpkRouter r=new MpkRouter((s,a,b)->sent.add(m(s,a,b)),new MpkRouter.Controls(){
             public void knob(int k,int v){controls.add("knob "+k+" "+v);}
             public void transport(MpkRouter.Transport t,boolean p){controls.add(t+" "+p);}
+            public void played(){played++;}
         });
 
         // Keys play the keys part (Sound design's), whatever channel they send on.
         r.keyPart(1);
         r.message(0x90,60,100);r.message(0x80,60,0);
         expect("keys on part 2","91 60 100","81 60 0");
+        check(played==1,"a key tells the app, so it can start audio");
         r.message(0x92,62,90);r.message(0x92,62,0);
         expect("any key channel, velocity 0 ends it","91 62 90","81 62 0");
 
@@ -34,6 +37,7 @@ public final class MpkRouterTest {
         // Pads: channel 10 notes 36-51 play the pads part (part 4 by default), velocity kept.
         r.message(0x99,36,81);r.message(0x89,36,0);r.message(0x99,51,94);r.message(0x99,51,0);
         expect("pads on part 4","93 36 81","83 36 0","93 51 94","83 51 0");
+        check(played==6,"pads tell the app too: "+played);
         r.message(0x99,60,100);expect("other channel-10 notes are ignored");
 
         // Pad pressure becomes channel aftertouch on the pads part: the strongest held pad.

@@ -15,7 +15,8 @@ package org.paleotone.synth.ui;
  *   ways on the keys part: sideways (CC12) bends up, up and down (CC2) bends down, by the part's
  *   bend range (2 semitones unless set by RPN). Bends add; releasing it returns to pitch.
  * - Knobs (CC70-77) and Play, Stop, Record (CC118, 117, 119) never reach the engine: they go to
- *   {@link Controls}, which the app runs on its main thread.
+ *   {@link Controls}, which the app runs on its main thread. So does every key or pad struck, so the
+ *   app can start its audio if something (STOP ALL on screen) turned it off.
  *
  * A note always ends on the channel it started on, so changing parts while holding keys or pads
  * leaves nothing hanging. Safe to call from the MIDI thread while the main thread changes parts.
@@ -24,7 +25,11 @@ public final class MpkRouter {
     /** Where messages for the engine go (status with channel, data bytes). */
     public interface Out{void midi(int status,int d1,int d2);}
     /** The MPK's own controls, called on the MIDI thread: post them to the main thread. */
-    public interface Controls{void knob(int knob,int value);void transport(Transport button,boolean pressed);}
+    public interface Controls{
+        void knob(int knob,int value);void transport(Transport button,boolean pressed);
+        /** A key or pad was struck: the app makes sure its audio is running, so the MPK always sounds. */
+        default void played(){}
+    }
     public enum Transport{PLAY,STOP,RECORD}
 
     public static final int PAD_LOW=36,PAD_HIGH=51,DEFAULT_PAD_PART=3;
@@ -67,7 +72,7 @@ public final class MpkRouter {
             case 0x90:
                 if(d2>0){
                     if(keyChannel[d1]>=0&&keyChannel[d1]!=part)out.midi(0x80|keyChannel[d1],d1,0); // retriggered on a new part
-                    keyChannel[d1]=part;out.midi(0x90|part,d1,d2);return;
+                    keyChannel[d1]=part;out.midi(0x90|part,d1,d2);controls.played();return;
                 }
                 // velocity 0 is a note off
             case 0x80:{
@@ -84,7 +89,7 @@ public final class MpkRouter {
         if(type==0x90&&value>0){
             int part=padPart;
             if(padChannel[note]>=0&&padChannel[note]!=part)out.midi(0x80|padChannel[note],note,0);
-            padChannel[note]=part;padPressure[note]=0;out.midi(0x90|part,note,value);
+            padChannel[note]=part;padPressure[note]=0;out.midi(0x90|part,note,value);controls.played();
         }else if(type==0x80||type==0x90){
             int c=padChannel[note]>=0?padChannel[note]:padPart;padChannel[note]=-1;padPressure[note]=0;
             out.midi(0x80|c,note,0);pressure(c);

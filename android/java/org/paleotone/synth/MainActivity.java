@@ -110,6 +110,8 @@ public final class MainActivity extends Activity {
             public void transport(org.paleotone.synth.ui.MpkRouter.Transport b,boolean pressed){
                 if(pressed){view.screens.mpkTransport(b,SystemClock.uptimeMillis());redraw();}
             }
+            /** A key or pad: audio may have been turned off by STOP ALL; the instrument should still sound. */
+            public void played(){ensureAudio();}
             public void connected(boolean on){view.screens.mpk.connected(on);redraw();}
         });
         audio.registerAudioDeviceCallback(devices,handler);

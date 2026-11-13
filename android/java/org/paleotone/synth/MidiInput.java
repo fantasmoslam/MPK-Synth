@@ -10,7 +10,7 @@ import java.util.ArrayList;
 
 final class MidiInput {
     /** MPK mini controls, on the main thread: knobs (0-7, raw 0-127), transport buttons, and connected on open and close. */
-    interface Mpk{void knob(int knob,int value);void transport(org.paleotone.synth.ui.MpkRouter.Transport button,boolean pressed);void connected(boolean on);}
+    interface Mpk{void knob(int knob,int value);void transport(org.paleotone.synth.ui.MpkRouter.Transport button,boolean pressed);void played();void connected(boolean on);}
     /** Routes the MPK's keys, pads and joystick to parts (MIDI thread); null while no MPK is open. */
     private volatile org.paleotone.synth.ui.MpkRouter router;
     private volatile int keyPart,padPart=org.paleotone.synth.ui.MpkRouter.DEFAULT_PAD_PART;
@@ -87,6 +87,11 @@ final class MidiInput {
                 r=new org.paleotone.synth.ui.MpkRouter(Native::midi,new org.paleotone.synth.ui.MpkRouter.Controls(){
                     public void knob(int k,int v){handler.post(()->mpk.knob(k,v));}
                     public void transport(org.paleotone.synth.ui.MpkRouter.Transport b,boolean pressed){handler.post(()->mpk.transport(b,pressed));}
+                    long lastPlayed;
+                    public void played(){   // at most a few times a second: the main thread starts audio if it is off
+                        long now=android.os.SystemClock.uptimeMillis();
+                        if(now-lastPlayed>=250){lastPlayed=now;handler.post(mpk::played);}
+                    }
                 });
                 r.keyPart(keyPart);r.padPart(padPart);
             }

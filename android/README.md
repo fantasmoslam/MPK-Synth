@@ -165,7 +165,8 @@ Bluetooth is not a suitable route for assessing playable latency.
     modulation matrix.
   - The joystick sends no direction (centre 0, either extreme 127), so sideways (CC12) bends the keys part up
     and up/down (CC2) bends it down, by its bend range (2 semitones by default); the two add.
-  - Play (CC118) is Play music / Stop music, Stop (CC117) is STOP ALL and Record (CC119) is Record / Stop
+  - Play (CC118) is Play music / Stop music, Stop (CC117) stops the music and any take but leaves audio on
+    (the screen's STOP ALL turns audio off; a key or pad then turns it back on), and Record (CC119) is Record / Stop
     recording, each with a notice. They go through `Screens.mpkTransport`, one entry point a looper can take over.
   - A note or pad always ends on the part it started on, and unplugging the MPK ends every note and bend.
 - Audio reconnects automatically after stream errors while foreground and playing,
