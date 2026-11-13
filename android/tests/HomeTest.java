@@ -84,14 +84,14 @@ public final class HomeTest {
         // The Kit: tap a pad on screen and it plays and becomes the pad the knobs shape.
         s.keyPart=3;frame();frame();
         float[] panel=region("panel");
-        check(g.texts.contains("KICK")&&g.texts.contains("RIDE"),"the Kit's pads");
+        check(g.texts.contains("RIM SHOT")&&g.texts.contains("COWBELL"),"the Kit's pads: "+g.texts);
         float side=Math.min(panel[3],panel[2]*.42f),pad=(side-34-30)/4;
         float gx=panel[0]+(side-(pad*4+30))/2,gy=panel[1]+30+(panel[3]-30-(pad*4+30))/2;
         // pad 6 (second row from the bottom, second column)
         ui.down(2,gx+pad+10+pad/2,gy+2*(pad+10)+pad/2);
         check(rig.lastPad==5&&host.notes.contains("3 41 true"),"a tapped pad plays and is chosen: "+rig.lastPad+" "+host.notes);
         ui.up(2,0,0);check(host.notes.contains("3 41 false"),"and ends");
-        frame();check(g.texts.contains("PAD 6 · TOM 1"),"its controls are shown: "+g.texts);
+        frame();check(g.texts.contains("PAD 6 · LOW TOM"),"its controls are shown: "+g.texts);
         // An MPK pad on the Kit's part chooses that pad.
         home.played(true,38,now);check(rig.lastPad==2,"an MPK pad chooses the drum");
 

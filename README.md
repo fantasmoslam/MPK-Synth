@@ -13,8 +13,9 @@ It installs as `org.fantasmoslam.mpksynth`.
   PWM, sub and noise, high-pass, a resonant 4-pole filter, envelope, LFO and the two-mode chorus.
   Its 128 presets are the Juno-106's factory patches (A11-B88), and its envelopes, LFO and filter
   scaling follow the Juno-106's own firmware.
-- **Kit**, an analog-style drum machine on the 16 pads (banks A and B), each pad with its own
-  tune, decay, tone and level. 4 kits (placeholders: not yet modelled on a specific machine).
+- **Kit**, the Roland TR-808's 16 instruments on the 16 pads (banks A and B), tuned and timed
+  from Roland's TR-808 service notes, each pad with its own tune, decay, tone and level, and
+  velocity playing the 808's accent. 3 kits.
 - **The MPK mini Plus**, as it comes: keys, pads with pressure, joystick bend and the 8 knobs,
   which follow the bank of controls lit on screen with pickup, so a sound never jumps.
 - **LEARN**, 11 lessons with moving pictures that wait for you to do each thing on the MPK or the

@@ -22,4 +22,4 @@ has to come from data about that instrument, not from taste.
 Pages:
 
 - [Poly 106 (Roland Juno-106)](poly106.md)
-- [Kit](kit.md): not yet modelled on a specific drum machine (see that page).
+- [Kit (Roland TR-808)](kit.md)
