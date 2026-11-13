@@ -116,8 +116,8 @@ public final class Ui {
         if(style==STOP){fill=Theme.SELECTED_FILL;edge=Theme.REQUEST;ink=Theme.REQUEST;edgeWidth=2;font=Gfx.DISPLAY;size=13;}
         if(style==QUIET){fill=Theme.BACKGROUND;}
         boolean pressed=held(id);
-        if(pressed)fill=style==NORMAL||style==QUIET?Theme.TRACK:Theme.PRESSED_SELECTED;
-        if(!enabled){fill=Theme.BACKGROUND;edge=Theme.DISABLED_EDGE;ink=Theme.DIM;}
+        if(pressed)fill=style==NORMAL||style==QUIET?Theme.TRACK:0xff3a3219;
+        if(!enabled){fill=Theme.BACKGROUND;edge=0xff2f3d2b;ink=Theme.DIM;}
         g.rect(x,y,w,h,fill);g.frame(x,y,w,h,edgeWidth,edge);
         if(style==RECORD&&enabled){
             float tw=g.textWidth(label,font,size,0);float dot=5;float cx=x+w/2-(tw+dot*2+8)/2+dot;
@@ -177,8 +177,8 @@ public final class Ui {
             g.line(cx+(float)Math.sin(a)*r1,cy-(float)Math.cos(a)*r1,cx+(float)Math.sin(a)*r2,cy-(float)Math.cos(a)*r2,1,Theme.DIM);
         }
         if(bipolar)g.line(cx,cy-r-6,cx,cy-r-15,2,Theme.PHOSPHOR);
-        g.circle(cx,cy,r,Theme.KNOB_BODY);g.ring(cx,cy,r,2,Theme.KNOB_RIM);
-        g.circle(cx,cy,r*.78f,Theme.KNOB_FACE);g.ring(cx,cy,r*.78f,1,Theme.KNOB_INNER);
+        g.circle(cx,cy,r,0xff101610);g.ring(cx,cy,r,2,Theme.KNOB_RIM);
+        g.circle(cx,cy,r*.78f,Theme.KNOB_FACE);g.ring(cx,cy,r*.78f,1,0xff3b4a37);
         float a=(float)Math.toRadians(210+300*t);
         g.line(cx+(float)Math.sin(a)*r*.62f,cy-(float)Math.cos(a)*r*.62f,cx+(float)Math.sin(a)*r*.92f,cy-(float)Math.cos(a)*r*.92f,3.2f,Theme.REQUEST);
         g.text(text,cx,cy+r*.24f,Gfx.MONO,d*.25f,Theme.REQUEST,Gfx.CENTER,0);
@@ -201,8 +201,8 @@ public final class Ui {
     public void fader(final String id,final float x,float y,final float w,float value,final float min,final float max,final IntConsumer set){
         float v=shown(id,value);float t=max>min?(v-min)/(max-min):0;t=Math.max(0,Math.min(1,t));
         float track=6,hx=x+t*w;
-        g.rect(x,y-track/2,w,track,Theme.TRACK);g.rect(x,y-track/2,hx-x,track,Theme.TEXT);
-        g.rect(hx-10,y-13,20,26,held(id)?Theme.REQUEST:Theme.CAP);g.frame(hx-10,y-13,20,26,1,Theme.BACKGROUND);
+        g.rect(x,y-track/2,w,track,Theme.TRACK);g.rect(x,y-track/2,hx-x,track,0xff8fd39b);
+        g.rect(hx-10,y-13,20,26,held(id)?Theme.REQUEST:0xffc6f2cc);g.frame(hx-10,y-13,20,26,1,Theme.BACKGROUND);
         hitDrag(id,x-14,y-30,w+28,60,new Drag(){
             float cur;
             void to(float px){cur=min+Math.max(0,Math.min(1,(px-x)/w))*(max-min);dragging.put(id,cur);set.accept(Math.round(cur));}
@@ -219,12 +219,12 @@ public final class Ui {
         float v=shown(id,value);float t=max>min?(v-min)/(max-min):0;t=Math.max(0,Math.min(1,t));
         float cx=x+w/2,capH=Math.min(26,h*.14f),top=y+capH/2,travel=h-capH;
         boolean on=held(id);
-        g.rect(cx-2.5f,y,5,h,Theme.SLOT);g.frame(cx-2.5f,y,5,h,1,Theme.TRACK);
+        g.rect(cx-2.5f,y,5,h,0xff0b100b);g.frame(cx-2.5f,y,5,h,1,Theme.TRACK);
         for(int i=0;i<=10;i++){float ty=top+travel*(1-i/10f);g.line(x+2,ty,cx-7,ty,1,i%5==0?Theme.DIM:Theme.TRACK);}
         float cy=top+travel*(1-t);
         float cw=Math.min(w-6,34);
-        g.rect(cx-cw/2,cy-capH/2,cw,capH,on?Theme.REQUEST:Theme.CAP);
-        g.line(cx-cw/2+3,cy,cx+cw/2-3,cy,2,on?Theme.BACKGROUND:Theme.CAP_LINE);
+        g.rect(cx-cw/2,cy-capH/2,cw,capH,on?Theme.REQUEST:0xffd8d4c2);
+        g.line(cx-cw/2+3,cy,cx+cw/2-3,cy,2,on?Theme.BACKGROUND:0xff222a20);
         final float span=Math.max(1,max-min),startValue=v,trav=Math.max(1,travel);
         hitDrag(id,x,y-12,w,h+24,new Drag(){
             float y0,cur;

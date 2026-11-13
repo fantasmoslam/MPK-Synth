@@ -122,7 +122,7 @@ public final class Home {
         boolean on=s.mpkConnected;
         String chip=on?"MPK MINI CONNECTED":"PLUG IN THE MPK MINI";
         float cw=g.textWidth(chip,Gfx.MONO,11,.06f)+34;
-        g.rect(cx,19,cw,30,on?Theme.CONNECTED_FILL:Theme.RAISED);g.frame(cx,19,cw,30,1,on?Theme.PHOSPHOR:Theme.BORDER);
+        g.rect(cx,19,cw,30,on?0xff1c2f1d:Theme.RAISED);g.frame(cx,19,cw,30,1,on?Theme.PHOSPHOR:Theme.BORDER);
         g.circle(cx+14,34,4,on?Theme.PHOSPHOR:Theme.DIM);
         g.text(chip,cx+26,38,Gfx.MONO,11,on?Theme.PHOSPHOR:Theme.MUTED,Gfx.LEFT,.06f);
         float after=cx+cw+14;
@@ -174,7 +174,6 @@ public final class Home {
     private void sound(float x,float y,float w,float h){
         Gfx g=ui.g;
         final int part=s.keyPart;Catalog.Model m=rig.model(part);
-        Theme.use(m.isKit()?Theme.DRUMS:Theme.PANEL_106);
         float sw=290;
         selector("model",x,y,sw-40,"PART "+(part+1)+" MODEL",m.name,()->stepModel(-1),()->stepModel(1),()->open(State.PICK_MODEL));
         selector("preset",x+sw-28,y,sw+40,"PRESET",rig.presetName(part)+(rig.edited(part)?" *":""),()->stepPreset(-1),()->stepPreset(1),()->open(State.PICK_PRESET));
@@ -189,7 +188,6 @@ public final class Home {
         float py=ty+68,ph=h-(py-y);
         regions.put("panel",new float[]{x,py,w,ph});
         if(m.isKit())kit(part,m,x,py,w,ph);else page(part,m,x,py,w,ph);
-        Theme.use(Theme.PANEL_106);
     }
 
     /**
@@ -259,11 +257,8 @@ public final class Home {
     /** One section of a panel: its name, then its controls side by side. */
     private void section(int part,String name,int[] ids,float x,float y,float w,float h){
         Gfx g=ui.g;ui.panel(x,y,w,h);
-        // The section's name printed in a white box, with a rule across the section, as on a panel.
-        float nw=g.textWidth(name,Gfx.MONO_MEDIUM,11,.14f)+18;
-        g.line(x+8,y+14,x+w-8,y+14,1,Theme.MUTED);
-        g.rect(x+12,y+4,nw,20,Theme.TEXT);
-        g.text(name,x+12+nw/2,y+18,Gfx.MONO_MEDIUM,11,Theme.BACKGROUND,Gfx.CENTER,.14f);
+        g.rect(x,y,w,26,Theme.RAISED);g.line(x,y+26,x+w,y+26,1,Theme.BORDER);
+        g.text(name,x+10,y+18,Gfx.MONO_MEDIUM,11,Theme.PHOSPHOR,Gfx.LEFT,.14f);
         float slot=w/ids.length;
         for(int i=0;i<ids.length;i++)control(part,ids[i],x+i*slot,y+26,slot,h-26);
     }
@@ -294,7 +289,7 @@ public final class Home {
             for(int i=0;i<n;i++){
                 final int value=c.max-i;   // highest at the top, like a panel switch
                 String label=value-c.min<c.names.length?c.names[value-c.min]:Integer.toString(value);
-                led(key+"."+value,mid-bw/2,top+i*(bh+6),bw,bh,Text.fit(g,label,bw-26,12),value==v,()->screen(part,id,value));
+                ui.button(key+"."+value,mid-bw/2,top+i*(bh+6),bw,bh,Text.fit(g,label,bw-8,12),value==v?Ui.SELECTED:Ui.NORMAL,true,()->screen(part,id,value));
             }
         }else if(c.ui==Catalog.UI_KNOB){
             float d=Math.min(Math.min(w-30,110),bottom-top-30);
@@ -313,16 +308,6 @@ public final class Home {
             if(mpk.position(k)>=0)g.rect(bx+bw*mpk.position(k)/127f-1,by-3,2,9,Theme.REQUEST);
         }
     }
-    /** A panel push button with its LED: lit red when it is the choice made. */
-    private void led(String id,float x,float y,float w,float h,String label,boolean on,Runnable tap){
-        Gfx g=ui.g;boolean pressed=ui.held(id);
-        g.rect(x,y,w,h,pressed?Theme.TRACK:Theme.RAISED);g.frame(x,y,w,h,1,on?Theme.MUTED:Theme.BORDER);
-        float lx=x+12,ly=y+h/2;
-        if(on)g.circle(lx,ly,7,0x55000000|(Theme.REQUEST&0xffffff));
-        g.circle(lx,ly,4,on?Theme.REQUEST:Theme.LED_OFF);
-        g.text(label,x+w/2+8,y+h/2+4.5f,Gfx.MONO,12,on?Theme.TEXT:Theme.MUTED,Gfx.CENTER,0);
-        ui.hit(id,x,y,w,h,tap);
-    }
     private void screen(int part,int id,int value){rig.set(part,id,value);event(Tutorial.SCREEN_KNOB,id,ui.now);}
 
     /** The Kit: its 16 pads to tap, the controls of the pad hit last, and the kit's own. */
@@ -339,7 +324,7 @@ public final class Home {
             boolean sel=i==rig.lastPad,flash=s.flashPad[part]==i&&ui.now-s.flashAt[part]<160;
             String id="pad."+part+"."+i;
             boolean held=ui.held(id)||flash;
-            g.rect(px,py,pad,pad,held?Theme.HIT:sel?Theme.SELECTED_FILL:Theme.RAISED);
+            g.rect(px,py,pad,pad,held?0xff3c5a3b:sel?Theme.SELECTED_FILL:Theme.RAISED);
             g.frame(px,py,pad,pad,sel?2:1,sel?Theme.REQUEST:Theme.BORDER);
             g.text(Integer.toString(i+1),px+8,py+18,Gfx.MONO,11,Theme.MUTED,Gfx.LEFT,0);
             g.text(Text.fit(g,rig.catalog.padName(i),pad-10,11),px+pad/2,py+pad-12,Gfx.MONO_MEDIUM,11,sel?Theme.REQUEST:Theme.TEXT,Gfx.CENTER,.04f);
@@ -416,7 +401,7 @@ public final class Home {
     // ---- a lesson step on the SOUND screen ----------------------------------------------
     private void coach(float x,float y,float w,float h){
         Gfx g=ui.g;
-        g.rect(x,y,w,h,Theme.COACH);g.frame(x,y,w,h,2,Theme.REQUEST);
+        g.rect(x,y,w,h,0xff1d2414);g.frame(x,y,w,h,2,Theme.REQUEST);
         Tutorial.Step st=tutorial.currentStep();
         g.text("LESSON "+(tutorial.lesson+1)+" · "+tutorial.current().title.toUpperCase(Locale.ROOT),x+18,y+24,Gfx.MONO,10.5f,Theme.MUTED,Gfx.LEFT,.1f);
         g.text(st.title,x+18,y+50,Gfx.DISPLAY,15,Theme.REQUEST,Gfx.LEFT,.02f);
