@@ -70,10 +70,24 @@ public final class MpkTest {
 
         // The strip shows every knob's name and value after a move, and hides again.
         Ui ui=new Ui();UiTest.RecordingGfx g=new UiTest.RecordingGfx();
-        ui.begin(g,1280,800,t);m.draw(ui,e,0,17,629,1246);ui.end();
+        ui.begin(g,1280,800,t);m.draw(ui,e,0,3,17,629,1246);ui.end();
         check(g.texts.contains("CUT")&&g.texts.contains("WAVE")&&g.texts.contains("K8"),"strip names the knobs: "+g.texts);
-        g=new UiTest.RecordingGfx();ui.begin(g,1280,800,t+Mpk.SHOW_MS+1);m.draw(ui,e,0,17,629,1246);ui.end();
+        g=new UiTest.RecordingGfx();ui.begin(g,1280,800,t+Mpk.SHOW_MS+1);m.draw(ui,e,0,3,17,629,1246);ui.end();
         check(g.texts.isEmpty(),"strip hides after a while");
-        System.out.println("PASS: MPK mini knobs: CC70-77 mapping, pickup on start, part, voice and outside changes, and the knob strip");
+        // Transport buttons do what the bottom bar does.
+        UiState state=new UiState();UiTest.FakeEngine fe=new UiTest.FakeEngine();Screens screens=new Screens(new Ui(),state,fe);
+        screens.mpkTransport(MpkRouter.Transport.PLAY,0);
+        check(fe.scapeCommands==1&&state.notice.contains("music stopped"),"Play toggles the music: "+state.notice);
+        screens.mpkTransport(MpkRouter.Transport.RECORD,0);
+        check(fe.recorder.state==Recorder.RECORDING,"Record starts a take");
+        screens.mpkTransport(MpkRouter.Transport.RECORD,0);
+        check(fe.recorder.state==Recorder.SAVED&&fe.recorder.stops==1,"Record again stops it");
+        screens.mpkTransport(MpkRouter.Transport.STOP,0);
+        check(fe.stopped,"Stop is STOP ALL");
+        // The pads part is saved with the interface.
+        state.padPart=1;UiState again=new UiState();again.load(state.save());
+        check(again.padPart==1,"pads part saved");
+        UiState older=new UiState();older.load("FOCUS;INSTRUMENT");check(older.padPart==3,"older saves keep part 4 for pads");
+        System.out.println("PASS: MPK mini knobs: CC70-77 mapping, pickup on start, part, voice and outside changes, the knob strip, transport buttons and the pads part");
     }
 }

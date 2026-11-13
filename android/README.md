@@ -153,8 +153,21 @@ Bluetooth is not a suitable route for assessing playable latency.
   else (a preset, another part or voice, the screen) the knob does nothing until it reaches the
   parameter's value, so the sound never jumps. Sound design marks each parameter with its knob (K1-K8,
   green once in control) and TURN UP / TURN DOWN until pickup; on other screens a strip with all eight
-  knobs' names and values shows for 2.5 s after a knob moves. Transport (CC117-119) and the joystick
-  (CC2, CC12) are not assigned yet. Logic: `java/org/paleotone/synth/ui/Mpk.java`, tests: `tests/MpkTest.java`.
+  knobs' names and values shows for 2.5 s after a knob moves. Logic: `java/org/paleotone/synth/ui/Mpk.java`,
+  tests: `tests/MpkTest.java`.
+- **The rest of the MPK** (`ui/MpkRouter.java`, on the MIDI thread; tests: `tests/MpkRouterTest.java`). The engine's
+  MIDI IN is CH1-4 (channels 1-4 play parts 1-4, the rest are ignored), so the MPK's channels are rewritten:
+  - Keys (any channel but 10) play the part open in Sound design, the same part the knobs edit.
+  - Pads (channel 10, notes 36-51, banks A and B) play the pads part, part 4 unless Sound design's **Pads play
+    this part** chooses another (saved with the interface). Notes and velocity are kept, so a DRUM voice plays
+    them as its General MIDI kit (36 kick, 38 snare, 42 closed hat...). Pad pressure (poly aftertouch, which the
+    engine ignores) becomes channel aftertouch on that part: the strongest held pad, the AT source of the part's
+    modulation matrix.
+  - The joystick sends no direction (centre 0, either extreme 127), so sideways (CC12) bends the keys part up
+    and up/down (CC2) bends it down, by its bend range (2 semitones by default); the two add.
+  - Play (CC118) is Play music / Stop music, Stop (CC117) is STOP ALL and Record (CC119) is Record / Stop
+    recording, each with a notice. They go through `Screens.mpkTransport`, one entry point a looper can take over.
+  - A note or pad always ends on the part it started on, and unplugging the MPK ends every note and bend.
 - Audio reconnects automatically after stream errors while foreground and playing,
   with a short debounce and at most five retries. Stop, backgrounding and lost focus
   cancel retries. If recovery is exhausted, START provides an explicit retry.
