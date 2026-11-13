@@ -11,9 +11,10 @@ It installs as `org.fantasmoslam.mpksynth`.
 
 - **Poly 106**, a six-voice polysynth modelled on the Roland Juno-106: DCO with saw, pulse,
   PWM, sub and noise, high-pass, a resonant 4-pole filter, envelope, LFO and the two-mode chorus.
-  12 presets.
+  Its 128 presets are the Juno-106's factory patches (A11-B88), and its envelopes, LFO and filter
+  scaling follow the Juno-106's own firmware.
 - **Kit**, an analog-style drum machine on the 16 pads (banks A and B), each pad with its own
-  tune, decay, tone and level. 4 kits.
+  tune, decay, tone and level. 4 kits (placeholders: not yet modelled on a specific machine).
 - **The MPK mini Plus**, as it comes: keys, pads with pressure, joystick bend and the 8 knobs,
   which follow the bank of controls lit on screen with pickup, so a sound never jumps.
 - **LEARN**, 11 lessons with moving pictures that wait for you to do each thing on the MPK or the
@@ -23,6 +24,13 @@ Coming next, one at a time: a looper that works like Loopy Pro, then the Voyage 
 Raw 20 (Korg MS-20), Patch 26 (ARP 2600) and Big 80 (Yamaha CS-80) models. The names of the
 instruments these models are built to resemble belong to their owners; MPK Synth is not
 affiliated with them.
+
+## Where the sounds come from
+
+Every model's presets and control behaviour must come from data about the real instrument
+(factory patches, manuals, firmware, measurements), never from taste, and every number is
+listed with its source. This applies to all future models too (Voyage, Raw 20, Patch 26,
+Big 80). See [docs/sound-sources](docs/sound-sources/README.md).
 
 ## Layout
 

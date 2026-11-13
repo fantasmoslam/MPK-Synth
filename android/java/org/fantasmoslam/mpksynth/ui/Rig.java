@@ -21,7 +21,7 @@ public final class Rig {
     public Rig(Catalog catalog,Sink sink){
         this.catalog=catalog;this.sink=sink;
         int poly=Math.max(0,catalog.find("Poly 106")),kit=catalog.find("Kit");
-        String[] start={"Brass Section","Funky Bass","Strings",null};
+        String[] start={"A11 Brass Set 1","A55 Synth Bass II","B11 Strings",null};
         for(int p=0;p<PARTS;p++){
             int m=p==3&&kit>=0?kit:poly;
             int pr=start[p]==null?0:indexOf(catalog.model(m).presets,start[p]);
