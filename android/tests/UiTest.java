@@ -21,7 +21,7 @@ public final class UiTest {
         public void clip(float x,float y,float w,float h){}
         public void unclip(){}
     }
-    static final class FakeEngine implements Engine {
+    static class FakeEngine implements Engine {
         final int[] v=new int[48];int scapeCommands;boolean stopped;
         public int value(int s){return v[s];}
         public int min(int s){return 0;}

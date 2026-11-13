@@ -102,10 +102,15 @@ public final class MainActivity extends Activity {
         library=new AndroidLibrary(this);recorder=new AndroidRecorder(this);engine=new NativeEngine(this,library,recorder);
         uiState.load(getPreferences(MODE_PRIVATE).getString("ui",null));
         view=new PhosphorView(this,uiState,engine);setContentView(view);
-        midi=new MidiInput(this);
+        midi=new MidiInput(this,new MidiInput.Mpk(){
+            public void knob(int k,int value){
+                view.screens.mpk.move(k,value,engine,uiState.designPart,SystemClock.uptimeMillis());redraw();
+            }
+            public void connected(boolean on){view.screens.mpk.connected(on);redraw();}
+        });
         audio.registerAudioDeviceCallback(devices,handler);
     }
-    @Override protected void onResume(){super.onResume();resumed=true;if(pickerAudio==null||pickerAudio)startAudio();pickerAudio=null;handler.post(refresh);KioskController.restore(this);}
+    @Override protected void onResume(){super.onResume();resumed=true;if(pickerAudio==null||pickerAudio)startAudio();pickerAudio=null;handler.post(refresh);KioskController.restore(this);midi.resume();}
     @Override public void onWindowFocusChanged(boolean focused){
         super.onWindowFocusChanged(focused);
         if(focused&&resumed)KioskController.restore(this);
@@ -118,7 +123,7 @@ public final class MainActivity extends Activity {
     void maintenance(){KioskController.menu(this);}
     @Override protected void onPause(){
         resumed=false;wantAudio=false;recovery.cancel();handler.removeCallbacks(refresh);
-        recorder.stop();midi.close();Native.stop();running=false;
+        recorder.stop();midi.pause();Native.stop();running=false;
         writeSession();
         getPreferences(MODE_PRIVATE).edit().putString("ui",uiState.save()).apply();lastTick=0;
         if(focusHeld)audio.abandonAudioFocus(focus);focusHeld=false;
