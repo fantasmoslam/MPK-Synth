@@ -506,19 +506,27 @@ public final class Screens {
     private static final String[] STATE_TITLES={"READY TO RECORD","RECORDING","SAVING TAKE","TAKE SAVED","TAKE NOT SAVED"};
     private Recorder recorder(){return e.recorder();}
     /**
-     * The MPK's Play, Stop and Record buttons: the bottom bar's Play music / Stop music,
-     * STOP ALL and Record / Stop recording. One entry point, so a looper can take them over later.
+     * The MPK's Play, Stop and Record buttons: Play music / Stop music, Stop (the music and any
+     * take, with audio left on for the keys) and Record / Stop recording. One entry point, so a
+     * looper can take them over later.
      */
     public void mpkTransport(MpkRouter.Transport button,long now){
         String said;
         switch(button){
             case PLAY:{
-                if(!e.musicEngine()||!e.audioOn()){said="MPK PLAY: music is not available";break;}
+                if(!e.musicEngine()){said="MPK PLAY: music is not available";break;}   // Play music starts audio itself
                 boolean music=e.musicPlaying();
                 e.scape(music?Engine.SCAPE_STOP_MUSIC:Engine.SCAPE_PLAY_MUSIC);
                 said=music?"MPK PLAY: music stopped":"MPK PLAY: music playing";break;
             }
-            case STOP:run.stopAll();said="MPK STOP: stop all";break;
+            case STOP:{
+                // An instrument's Stop: the music and any take stop, but audio stays on so the keys and pads
+                // keep sounding (the screen's STOP ALL also turns audio off).
+                Recorder r=recorder();boolean took=r!=null&&r.state()==Recorder.RECORDING;
+                if(took)r.stop();
+                if(e.musicPlaying())e.scape(Engine.SCAPE_STOP_MUSIC);
+                said=took?"MPK STOP: music and recording stopped":"MPK STOP: music stopped";break;
+            }
             default:{
                 Recorder r=recorder();
                 if(r==null){said="MPK RECORD: recording is not available";break;}
