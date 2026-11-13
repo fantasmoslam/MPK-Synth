@@ -2,7 +2,7 @@ name: Android native alpha
 on:
   workflow_dispatch:
   push:
-    branches: [feature/android-native-sm-t510]
+    branches: [main]
   pull_request:
     paths: ['android/**', '.github/workflows/android-native.yml']
 permissions:
