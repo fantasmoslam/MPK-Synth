@@ -53,8 +53,8 @@ int main(void) {
     }
     printf("PASS: model tables, banks and presets in range\n");
 
-    /* Poly 106 in tune: A4 on part 1, saw only, filter open, no chorus. */
-    preset(0, 0, 0);
+    /* Poly 106 in tune: A4 on part 1 with the default controls (8'), saw only, no chorus. */
+    mpe_part_model(0, 0);
     mpe_param(0, (unsigned)mpe_find(mpe_model(0), "PULSE"), 0);
     mpe_param(0, (unsigned)mpe_find(mpe_model(0), "CHORUS"), 0);
     mpe_midi(0x90, 69, 100); run(1.0f);
@@ -75,18 +75,21 @@ int main(void) {
     printf("PASS: Poly 106 in tune, bends 2 semitones, 16' an octave down, silent after release\n");
 
     /* Every preset: a full six-note chord at full velocity stays finite and below clipping
-     * (the limiter catches the rest), sounds, and ends after release. */
+     * (the limiter catches the rest), sounds, and ends after release (the Juno-106's
+     * longest release takes about 40 s to reach silence). */
     for (unsigned p = 0; p < mpe_model(0)->npresets; ++p) {
         mpe_panic(); preset(0, 0, p);
         static const int chord[6] = { 36, 48, 55, 60, 64, 67 };
         for (int k = 0; k < 6; ++k) mpe_midi(0x90, (unsigned)chord[k], 127);
-        run(1.5f);
-        float pk = peak(RATE * 3 / 2), loud = rms(RATE / 10, RATE / 5);
-        printf("  %-16s peak %.2f, rms %.3f\n", mpe_model(0)->presets[p].name, pk, loud);
-        assert(pk < 1.6f && loud > 0.01f);
+        run(2.0f);
+        float pk = peak(RATE * 2), loud = 0;
+        for (unsigned from = 0; from + RATE / 10 <= RATE * 2; from += RATE / 10) loud = fmaxf(loud, rms(from, RATE / 10));
+        printf("  %-30s peak %.2f, loudest rms %.3f\n", mpe_model(0)->presets[p].name, pk, loud);
+        assert(pk < 1.6f && pk > 0.01f && loud > 0.003f);   /* A86 Hand Claps is a short burst */
         for (int k = 0; k < 6; ++k) mpe_midi(0x80, (unsigned)chord[k], 0);
-        run(4.0f); run(4.0f);
-        assert(rms(RATE * 3, RATE) < 1e-3f);
+        int s = 0;
+        while (s < 60) { run(1.0f); ++s; if (rms(0, RATE) < 1e-4f) break; }
+        assert(s < 60);
     }
     printf("PASS: every Poly 106 preset sounds, stays below clipping and ends after release\n");
 
@@ -128,7 +131,7 @@ int main(void) {
     printf("PASS: all 16 drum pads sound, follow velocity, ring out, and the hat chokes\n");
 
     /* A rate change keeps the sound in tune. */
-    mpe_set_rate(44100); mpe_panic(); preset(0, 0, 0);
+    mpe_set_rate(44100); mpe_panic(); mpe_part_model(0, 0);
     mpe_param(0, (unsigned)mpe_find(mpe_model(0), "PULSE"), 0); mpe_param(0, (unsigned)mpe_find(mpe_model(0), "CHORUS"), 0);
     mpe_midi(0x90, 69, 100); mpe_render(buf, 44100);
     { int best = 0; double bv = -1e30; for (int lag = 60; lag < 200; ++lag) { double s = 0; for (int i = 20000; i < 24096; ++i) s += (double)buf[2 * i] * buf[2 * (i + lag)]; if (s > bv) { bv = s; best = lag; } }

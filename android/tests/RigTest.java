@@ -8,8 +8,8 @@ public final class RigTest {
     public static void main(String[] args)throws Exception{
         TableSource t=new TableSource(args[0]);Catalog c=new Catalog(t);
         Rig rig=new Rig(c,t.sink());
-        check(rig.model(0).name.equals("Poly 106")&&rig.presetName(0).equals("Brass Section"),"part 1 starts as Poly 106 Brass Section");
-        check(rig.presetName(1).equals("Funky Bass")&&rig.presetName(2).equals("Strings"),"parts 2 and 3: "+rig.presetName(1)+", "+rig.presetName(2));
+        check(rig.model(0).name.equals("Poly 106")&&rig.presetName(0).equals("A11 Brass Set 1"),"part 1 starts as Poly 106 A11 Brass Set 1");
+        check(rig.presetName(1).equals("A55 Synth Bass II")&&rig.presetName(2).equals("B11 Strings"),"parts 2 and 3: "+rig.presetName(1)+", "+rig.presetName(2));
         check(rig.model(3).isKit(),"part 4 is the drums");
         int expected=0;for(int p=0;p<Rig.PARTS;p++)expected+=1+rig.model(p).controls.length;
         check(t.sent.size()==expected,"every part's model and every value is sent at the start: "+t.sent.size()+" of "+expected);
@@ -62,8 +62,8 @@ public final class RigTest {
         check(again.value(2,freq.id)==11&&again.edited(2),"the edit survives");
         // Anything that no longer fits is left at its preset.
         Rig odd=new Rig(c,null);
-        odd.restore("Nonesuch|0|1|1,2\nPoly 106|99|1|1,2,3\nKit|1|0|"+"\n");
-        check(odd.presetName(0).equals("Brass Section"),"an unknown model is skipped");
+        odd.restore("Nonesuch|0|1|1,2\nPoly 106|999|1|1,2,3\nKit|1|0|"+"\n");
+        check(odd.presetName(0).equals("A11 Brass Set 1"),"an unknown model is skipped");
         check(odd.model(1).name.equals("Poly 106")&&odd.preset(1)==0&&!odd.edited(1),"a bad preset falls back to the first, short values are ignored");
         check(odd.model(2).isKit()&&odd.preset(2)==1,"a model and preset without values");
         odd.restore(null);odd.restore("");
