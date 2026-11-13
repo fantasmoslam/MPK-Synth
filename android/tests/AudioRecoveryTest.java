@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-package org.paleotone.synth;
+package org.fantasmoslam.mpksynth;
 public final class AudioRecoveryTest {
     public static void main(String[] args){
         AudioRecovery r=new AudioRecovery();

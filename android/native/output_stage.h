@@ -16,7 +16,8 @@ static inline float pt_output_process(pt_output_t *s,float *audio,unsigned frame
     for(unsigned i=0;i<frames;++i) {
         s->gain+=(target-s->gain)*s->gain_step;
         float l=audio[2*i],r=audio[2*i+1];
-        if(!isfinite(l))l=0;if(!isfinite(r))r=0;
+        if(!isfinite(l))l=0;
+        if(!isfinite(r))r=0;
         l*=s->gain; r*=s->gain;
         float magnitude=fmaxf(fabsf(l),fabsf(r));
         float limit=magnitude>0.98f?0.98f/magnitude:1.0f;
