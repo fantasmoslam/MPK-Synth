@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-package org.paleotone.synth.ui;
+package org.fantasmoslam.mpksynth.ui;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -8,7 +8,7 @@ import java.util.List;
 public final class MpkRouterTest {
     static void check(boolean ok,String what){if(!ok)throw new AssertionError(what);}
     static final List<String> sent=new ArrayList<>(),controls=new ArrayList<>();
-    static int played;
+    static int played,pads,lastBend;
     static String m(int s,int a,int b){return String.format("%02X %d %d",s,a,b);}
     static void expect(String what,String... messages){
         check(sent.equals(List.of(messages)),what+": "+sent);sent.clear();
@@ -18,7 +18,8 @@ public final class MpkRouterTest {
         MpkRouter r=new MpkRouter((s,a,b)->sent.add(m(s,a,b)),new MpkRouter.Controls(){
             public void knob(int k,int v){controls.add("knob "+k+" "+v);}
             public void transport(MpkRouter.Transport t,boolean p){controls.add(t+" "+p);}
-            public void played(){played++;}
+            public void played(boolean pad,int note){played++;if(pad)pads++;}
+            public void joystick(int bend){lastBend=bend;}
         });
 
         // Keys play the keys part (Sound design's), whatever channel they send on.
@@ -37,7 +38,7 @@ public final class MpkRouterTest {
         // Pads: channel 10 notes 36-51 play the pads part (part 4 by default), velocity kept.
         r.message(0x99,36,81);r.message(0x89,36,0);r.message(0x99,51,94);r.message(0x99,51,0);
         expect("pads on part 4","93 36 81","83 36 0","93 51 94","83 51 0");
-        check(played==6,"pads tell the app too: "+played);
+        check(played==6&&pads==2,"pads tell the app too: "+played);
         r.message(0x99,60,100);expect("other channel-10 notes are ignored");
 
         // Pad pressure becomes channel aftertouch on the pads part: the strongest held pad.
@@ -74,6 +75,9 @@ public final class MpkRouterTest {
         r.message(0x90,48,90);r.message(0x99,44,90);r.message(0xB0,12,64);sent.clear();
         r.release();
         expect("release","80 44 0","80 48 0","E0 0 64");
-        System.out.println("PASS: MPK router: keys follow Sound design's part, pads on their own part with pressure, joystick bend, knobs and transport kept from the engine, nothing left hanging");
+        r.keyPart(0);r.message(0xb0,Mpk.CC_JOYSTICK_X,127);
+        check(lastBend==8191,"the joystick reports its bend: "+lastBend);
+        r.message(0xb0,Mpk.CC_JOYSTICK_X,0);check(lastBend==0,"and its return: "+lastBend);
+        System.out.println("PASS: MPK router: keys follow the keys part, pads on their own part with pressure, joystick bend, knobs and transport kept from the engine, nothing left hanging");
     }
 }

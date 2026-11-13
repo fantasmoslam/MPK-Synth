@@ -1,37 +1,45 @@
 # MPK Synth
 
-An Android synth for the Akai MPK mini Plus, built on the work of
-[Paleotone](https://github.com/fantasmoslam/Paleotone): the same native engine (the FM-1 firmware's synth,
-run on the tablet), the PALEO sound engine and Scape conductor, and the round-three tablet interface.
-It installs as `org.fantasmoslam.mpksynth`, beside Paleotone rather than over it.
+An Android synthesizer played from the Akai MPK mini Plus. Four parts play at once: the keys
+play one, the pads another, and the eight knobs shape the sound on screen. Each part runs a
+synth model with its own panel of controls, and a built-in course teaches everything from the
+first key press to shaping a drum kit.
 
-This repository started as Paleotone's Android branch with its full history, trimmed to what the app builds
-from, tests with, or could use. Everything removed (the FM-1 firmware packaging and loader, the web
-installer, editor and site, the firmware host test suite, the VST side project) is still in this repository's
-history and in Paleotone.
+It installs as `org.fantasmoslam.mpksynth`.
+
+## What is in 0.5.0
+
+- **Poly 106**, a six-voice polysynth modelled on the Roland Juno-106: DCO with saw, pulse,
+  PWM, sub and noise, high-pass, a resonant 4-pole filter, envelope, LFO and the two-mode chorus.
+  12 presets.
+- **Kit**, an analog-style drum machine on the 16 pads (banks A and B), each pad with its own
+  tune, decay, tone and level. 4 kits.
+- **The MPK mini Plus**, as it comes: keys, pads with pressure, joystick bend and the 8 knobs,
+  which follow the bank of controls lit on screen with pickup, so a sound never jumps.
+- **LEARN**, 11 lessons with moving pictures that wait for you to do each thing on the MPK or the
+  screen, and a list of words to know.
+
+Coming next, one at a time: a looper that works like Loopy Pro, then the Voyage (Moog Voyager),
+Raw 20 (Korg MS-20), Patch 26 (ARP 2600) and Big 80 (Yamaha CS-80) models. The names of the
+instruments these models are built to resemble belong to their owners; MPK Synth is not
+affiliated with them.
 
 ## Layout
 
-- `android/` — the app: Java interface and MIDI, native audio bridge, build script, tests, preview renderer.
-  Start with [android/README.md](android/README.md).
-- `firmware/src`, `firmware/hal` — the synth engine the app runs (compiled for Android through
-  `web/emu/felucca_web.c` and `tests/hostsim.c`).
-- `paleo/` — the PALEO engine, Faust voices, creature and instrument libraries, phrases, scores and tools.
-- `assets/` — CC0 samples, fonts and icons; `tools/` — the generators `tools/build.py --gen-only` runs.
-- `docs/` — Scape design notes and the original Paleotone README.
+- `android/java` — the app: the screen (`ui/`, plain Java drawing through `Gfx`), MIDI, audio focus.
+- `android/native` — the synth: `mpk/` holds the models and engine, `synth.c` the AAudio stream and
+  JNI, `looper.h` the looper core for the next stage.
+- `android/tests`, `android/test.sh` — tests that run on a desktop compiler and JDK.
+- `android/preview` — screenshots of the real screen code on a desktop JDK.
 
 ## Build and test
 
 ```sh
-python3 -m pip install pillow==12.3.0 fonttools==4.61.1 numpy==2.3.5
-sh android/test.sh                    # native engine, PALEO bridge and interface tests (no SDK needed)
-sh android/preview/render.sh build/preview   # interface screenshots on a desktop JDK
-python3 android/build.py              # the APK; needs the Android SDK/NDK listed in android/build.py
+sh android/test.sh                            # synth, looper and interface tests (no SDK needed)
+sh android/preview/render.sh build/preview    # screenshots
+python3 android/build.py                      # the APK; needs the Android SDK/NDK listed there
 ```
 
-CI (`.github/workflows/android-native.yml`) builds and tests the APK on pushes to `main` and on pull
-requests that touch `android/`. A permanent signing key goes in the `ANDROID_KEYSTORE_BASE64` secret.
+CI builds the signed APK on every pull request (`.github/workflows/android-native.yml`).
 
-## License
-
-GPL-3.0-only, as Paleotone; see [LICENSE](LICENSE) and [LICENSING.md](LICENSING.md).
+GPL-3.0-only; see [LICENSING.md](LICENSING.md).
