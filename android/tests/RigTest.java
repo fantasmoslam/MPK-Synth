@@ -49,7 +49,14 @@ public final class RigTest {
         rig.lastPad=5;int k5=rig.resolve(3,Catalog.PAD_CONTROL+1);
         check(rig.control(3,k0).section.equals(rig.control(3,4).section)&&k5==4+5*4+1,"pad slots: "+k0+", "+k5);
         check(rig.control(3,k5).label.equals("DECAY"),"slot 2 is the pad's DECAY: "+rig.control(3,k5).label);
-        rig.bank(0,99);check(rig.bank(0)==poly.banks.length-1,"bank clamped");
+        rig.bank(0,99);check(rig.bank(0)==poly.tabs.length-1,"tab clamped");
+        // Every control is on a tab: the banks, then what no bank holds (BEND and VELOCITY on the Poly 106).
+        for(Catalog.Model m:c.models){
+            boolean[] on=new boolean[m.controls.length];
+            for(Catalog.Bank b:m.tabs)for(int id:b.ids){if(id>=Catalog.PAD_CONTROL)for(int i=4;i<on.length;i++)on[i]=true;else if(id>=0)on[id]=true;}
+            for(int i=0;i<on.length;i++)check(on[i],m.name+" "+m.controls[i].label+" is on a tab");
+        }
+        check(poly.tabs.length==poly.banks.length+1&&poly.tabs[poly.tabs.length-1].name.equals("CONTROL"),"the Poly 106's extra tab: "+poly.tabs[poly.tabs.length-1].name);
 
         // Saving and restoring keeps models, presets, edits and values.
         rig.set(2,freq.id,11);

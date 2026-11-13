@@ -24,6 +24,8 @@ final class MidiInput {
         void played(boolean pad,int note);
         /** The joystick's bend, at most every 30 ms while it moves. */
         void joystick(int bend);
+        /** A program change: pad n in PROG CHANGE mode. */
+        void program(int number);
         void connected(boolean on);
     }
     private final Listener listener;
@@ -80,6 +82,7 @@ final class MidiInput {
                 public void knob(int k,int v){handler.post(()->listener.knob(k,v));}
                 public void transport(MpkRouter.Transport b,boolean pressed){handler.post(()->listener.transport(b,pressed));}
                 public void played(boolean pad,int note){handler.post(()->listener.played(pad,note));}
+                public void program(int number){handler.post(()->listener.program(number));}
                 long lastBend;
                 public void joystick(int bend){
                     long now=SystemClock.uptimeMillis();

@@ -57,8 +57,8 @@ public final class Home {
 
     /** What knob k drives on a part: the control in its slot of the part's bank. */
     Mpk.Target target(int part,int k){
-        Catalog.Model m=rig.model(part);if(m.banks.length==0)return null;
-        int slot=m.banks[rig.bank(part)].ids[k];if(slot<0)return null;
+        Catalog.Model m=rig.model(part);if(m.tabs.length==0)return null;
+        int slot=m.tabs[rig.bank(part)].ids[k];if(slot<0)return null;
         int id=rig.resolve(part,slot);
         Catalog.Control c=rig.control(part,id);if(c==null)return null;
         return new ControlTarget(part,m.id,c);
@@ -74,8 +74,8 @@ public final class Home {
     }
     /** The knob (0-7) that drives control id on a part, or -1. */
     int knobFor(int part,int id){
-        Catalog.Model m=rig.model(part);if(m.banks.length==0)return -1;
-        int[] ids=m.banks[rig.bank(part)].ids;
+        Catalog.Model m=rig.model(part);if(m.tabs.length==0)return -1;
+        int[] ids=m.tabs[rig.bank(part)].ids;
         for(int k=0;k<8;k++)if(ids[k]>=0&&rig.resolve(part,ids[k])==id)return k;
         return -1;
     }
@@ -122,7 +122,7 @@ public final class Home {
         boolean on=s.mpkConnected;
         String chip=on?"MPK MINI CONNECTED":"PLUG IN THE MPK MINI";
         float cw=g.textWidth(chip,Gfx.MONO,11,.06f)+34;
-        g.rect(cx,19,cw,30,on?0xff1c2f1d:Theme.RAISED);g.frame(cx,19,cw,30,1,on?Theme.PHOSPHOR:Theme.BORDER);
+        g.rect(cx,19,cw,30,on?Theme.CONNECTED_FILL:Theme.RAISED);g.frame(cx,19,cw,30,1,on?Theme.PHOSPHOR:Theme.BORDER);
         g.circle(cx+14,34,4,on?Theme.PHOSPHOR:Theme.DIM);
         g.text(chip,cx+26,38,Gfx.MONO,11,on?Theme.PHOSPHOR:Theme.MUTED,Gfx.LEFT,.06f);
         float after=cx+cw+14;
@@ -174,71 +174,96 @@ public final class Home {
     private void sound(float x,float y,float w,float h){
         Gfx g=ui.g;
         final int part=s.keyPart;Catalog.Model m=rig.model(part);
+        Theme.use(m.isKit()?Theme.DRUMS:Theme.PANEL_106);
         float sw=290;
         selector("model",x,y,sw-40,"PART "+(part+1)+" MODEL",m.name,()->stepModel(-1),()->stepModel(1),()->open(State.PICK_MODEL));
         selector("preset",x+sw-28,y,sw+40,"PRESET",rig.presetName(part)+(rig.edited(part)?" *":""),()->stepPreset(-1),()->stepPreset(1),()->open(State.PICK_PRESET));
         regions.put("preset",new float[]{x+sw-28,y,sw+40,48});
-        // the knob banks, right-aligned
-        float bw=96,bx=x+w-m.banks.length*(bw+8)+8;
-        float ix=x+2*sw+28,iw=bx-110-ix;
+        float ix=x+2*sw+28,iw=x+w-ix;
         if(!m.inspired.isEmpty()&&iw>120){
             g.text("MODELLED ON",ix,y+20,Gfx.MONO,9.5f,Theme.MUTED,Gfx.LEFT,.1f);
             g.text(Text.fit(g,m.inspired,iw,13),ix,y+40,Gfx.MONO,13,Theme.TEXT,Gfx.LEFT,0);
         }
-        g.text("MPK KNOBS",bx-14,y+30,Gfx.MONO,10.5f,Theme.MUTED,Gfx.RIGHT,.1f);
-        for(int b=0;b<m.banks.length;b++){
-            final int bank=b;
-            ui.button("bank."+b,bx+b*(bw+8),y,bw,48,m.banks[b].name,b==rig.bank(part)?Ui.SELECTED:Ui.NORMAL,true,()->{
-                if(rig.bank(part)!=bank){rig.bank(part,bank);mpk.releaseAll();}
-                event(Tutorial.BANK,bank,ui.now);
-            });
-        }
-        if(m.banks.length>0)regions.put("banks",new float[]{bx,y,m.banks.length*(bw+8)-8,48});
-        float py=y+60,ph=h-60;
+        float ty=y+60;
+        tabs(part,m,x,ty,w,56);
+        float py=ty+68,ph=h-(py-y);
         regions.put("panel",new float[]{x,py,w,ph});
-        if(m.isKit())kit(part,m,x,py,w,ph);else panel(part,m,x,py,w,ph);
+        if(m.isKit())kit(part,m,x,py,w,ph);else page(part,m,x,py,w,ph);
+        Theme.use(Theme.PANEL_106);
     }
 
-    /** Every control of a model, in its panel sections, wrapped into as many rows as fit. */
-    private void panel(int part,Catalog.Model m,float x,float y,float w,float h){
-        String[] sections=m.sections();
-        ArrayList<int[]> ids=new ArrayList<>();int total=0;
-        for(String sec:sections){
-            ArrayList<Integer> l=new ArrayList<>();
-            for(Catalog.Control c:m.controls)if(c.section.equals(sec))l.add(c.id);
-            int[] a=new int[l.size()];for(int i=0;i<a.length;i++)a[i]=l.get(i);
-            ids.add(a);total+=a.length;
+    /**
+     * The tab bar: one tab per cluster of controls, each the 8 the knobs turn while it is open.
+     * On the MPK, PROG CHANGE then pad n opens tab n.
+     */
+    private void tabs(final int part,Catalog.Model m,float x,float y,float w,float h){
+        Gfx g=ui.g;int n=m.tabs.length;if(n==0)return;
+        float gap=8,tw=Math.min(240,(w-gap*(n-1))/n);
+        regions.put("banks",new float[]{x,y,n*(tw+gap)-gap,h});
+        for(int b=0;b<n;b++){
+            final int bank=b;String id="tab."+b;
+            float bx=x+b*(tw+gap);boolean on=b==rig.bank(part),pressed=ui.held(id);
+            g.rect(bx,y,tw,h,on?Theme.SELECTED_FILL:pressed?Theme.TRACK:Theme.RAISED);
+            g.frame(bx,y,tw,h,on?2:1,on?Theme.REQUEST:Theme.BORDER);
+            if(on)g.rect(bx,y+h-4,tw,4,Theme.REQUEST);
+            g.text(Text.fit(g,m.tabs[b].name,tw-70,Gfx.DISPLAY,14),bx+14,y+h/2+6,Gfx.DISPLAY,14,on?Theme.REQUEST:Theme.TEXT,Gfx.LEFT,.04f);
+            g.text("PAD "+(b+1),bx+tw-12,y+h/2+4,Gfx.MONO,10,Theme.MUTED,Gfx.RIGHT,.08f);
+            ui.hit(id,bx,y,tw,h,()->openTab(part,bank));
         }
-        float gap=10,minSlot=74;
-        int rows=Math.max(1,(int)Math.ceil(total*minSlot/w));
-        rows=Math.min(rows,3);
-        // balanced rows: break after the section that passes each row's share
-        ArrayList<ArrayList<Integer>> rowSections=new ArrayList<>();
-        int done=0,row=0;rowSections.add(new ArrayList<>());
-        for(int i=0;i<sections.length;i++){
-            int n=ids.get(i).length;
-            float share=(float)total*(row+1)/rows;
-            if(!rowSections.get(row).isEmpty()&&done+n/2f>share&&row<rows-1){row++;rowSections.add(new ArrayList<>());}
-            rowSections.get(row).add(i);done+=n;
+        float hx=x+n*(tw+gap)+8;
+        if(x+w-hx>260){
+            g.text("MPK: PROG CHANGE, then a pad,",x+w,y+h/2-3,Gfx.MONO,10.5f,Theme.MUTED,Gfx.RIGHT,.04f);
+            g.text("opens that tab; the knobs follow",x+w,y+h/2+13,Gfx.MONO,10.5f,Theme.MUTED,Gfx.RIGHT,.04f);
         }
-        float rh=(h-gap*(rowSections.size()-1))/rowSections.size();
-        for(int r=0;r<rowSections.size();r++){
-            ArrayList<Integer> secs=rowSections.get(r);
-            int n=0;for(int i:secs)n+=ids.get(i).length;
-            float sx=x,avail=w-gap*(secs.size()-1),ry=y+r*(rh+gap);
-            for(int i:secs){
-                float sw=avail*ids.get(i).length/n;
-                section(part,sections[i],ids.get(i),sx,ry,sw,rh);
-                sx+=sw+gap;
+    }
+    void openTab(int part,int bank){
+        if(rig.bank(part)!=bank){rig.bank(part,bank);mpk.releaseAll();}
+        event(Tutorial.BANK,bank,ui.now);
+    }
+    /** A program change from the MPK (PROG CHANGE pad mode): pad n opens tab n of the keys part. */
+    public void program(int number,long now){
+        int part=s.keyPart;Catalog.Model m=rig.model(part);
+        if(m.tabs.length==0)return;
+        int t=number%8;
+        if(t>=m.tabs.length){s.notice(m.name+" has "+m.tabs.length+" tabs: pads 1 to "+m.tabs.length,now);return;}
+        if(s.tab!=State.TAB_SOUND&&!s.coached)s.tab=State.TAB_SOUND;
+        if(rig.bank(part)!=t){rig.bank(part,t);mpk.releaseAll();}
+        event(Tutorial.BANK,t,now);
+    }
+
+    /** The open tab: its 8 controls across the screen, where K1 to K8 sit, grouped by panel section. */
+    private void page(int part,Catalog.Model m,float x,float y,float w,float h){
+        int[] slots=m.tabs[rig.bank(part)].ids;
+        float slot=w/8,gap=10;
+        int k=0;
+        while(k<8){
+            if(slots[k]<0||rig.control(part,rig.resolve(part,slots[k]))==null){k++;continue;}
+            Catalog.Control c=rig.control(part,rig.resolve(part,slots[k]));
+            String name=sectionName(part,c);
+            int start=k;ArrayList<Integer> ids=new ArrayList<>();
+            while(k<8&&slots[k]>=0){
+                Catalog.Control d=rig.control(part,rig.resolve(part,slots[k]));
+                if(d==null||!sectionName(part,d).equals(name))break;
+                ids.add(d.id);k++;
             }
+            int[] a=new int[ids.size()];for(int i=0;i<a.length;i++)a[i]=ids.get(i);
+            float sx=x+start*slot+(start>0?gap/2:0),swid=a.length*slot-(start>0?gap/2:0)-(k<8?gap/2:0);
+            section(part,name,a,sx,y,swid,h);
         }
+    }
+    private String sectionName(int part,Catalog.Control c){
+        if(rig.model(part).isKit()&&c.id>=4)return "PAD "+(rig.lastPad+1)+" · "+rig.catalog.padName(rig.lastPad);
+        return c.section;
     }
 
     /** One section of a panel: its name, then its controls side by side. */
     private void section(int part,String name,int[] ids,float x,float y,float w,float h){
         Gfx g=ui.g;ui.panel(x,y,w,h);
-        g.rect(x,y,w,26,Theme.RAISED);g.line(x,y+26,x+w,y+26,1,Theme.BORDER);
-        g.text(name,x+10,y+18,Gfx.MONO_MEDIUM,11,Theme.PHOSPHOR,Gfx.LEFT,.14f);
+        // The section's name printed in a white box, with a rule across the section, as on a panel.
+        float nw=g.textWidth(name,Gfx.MONO_MEDIUM,11,.14f)+18;
+        g.line(x+8,y+14,x+w-8,y+14,1,Theme.MUTED);
+        g.rect(x+12,y+4,nw,20,Theme.TEXT);
+        g.text(name,x+12+nw/2,y+18,Gfx.MONO_MEDIUM,11,Theme.BACKGROUND,Gfx.CENTER,.14f);
         float slot=w/ids.length;
         for(int i=0;i<ids.length;i++)control(part,ids[i],x+i*slot,y+26,slot,h-26);
     }
@@ -269,10 +294,10 @@ public final class Home {
             for(int i=0;i<n;i++){
                 final int value=c.max-i;   // highest at the top, like a panel switch
                 String label=value-c.min<c.names.length?c.names[value-c.min]:Integer.toString(value);
-                ui.button(key+"."+value,mid-bw/2,top+i*(bh+6),bw,bh,Text.fit(g,label,bw-8,12),value==v?Ui.SELECTED:Ui.NORMAL,true,()->screen(part,id,value));
+                led(key+"."+value,mid-bw/2,top+i*(bh+6),bw,bh,Text.fit(g,label,bw-26,12),value==v,()->screen(part,id,value));
             }
         }else if(c.ui==Catalog.UI_KNOB){
-            float d=Math.min(Math.min(w-30,74),bottom-top-30);
+            float d=Math.min(Math.min(w-30,110),bottom-top-30);
             ui.knob(key,mid,(top+bottom)/2-4,d,v,c.min,c.max,c.fmt==Catalog.FMT_BIPOLAR,"",n->screen(part,id,n));
             g.text(c.text(v),mid,bottom+18,Gfx.MONO,13,Theme.REQUEST,Gfx.CENTER,0);
         }else{
@@ -287,6 +312,16 @@ public final class Home {
             g.rect(bx,by,bw,3,Theme.TRACK);g.rect(bx,by,bw*Math.max(0,Math.min(1,tt)),3,Theme.PHOSPHOR);
             if(mpk.position(k)>=0)g.rect(bx+bw*mpk.position(k)/127f-1,by-3,2,9,Theme.REQUEST);
         }
+    }
+    /** A panel push button with its LED: lit red when it is the choice made. */
+    private void led(String id,float x,float y,float w,float h,String label,boolean on,Runnable tap){
+        Gfx g=ui.g;boolean pressed=ui.held(id);
+        g.rect(x,y,w,h,pressed?Theme.TRACK:Theme.RAISED);g.frame(x,y,w,h,1,on?Theme.MUTED:Theme.BORDER);
+        float lx=x+12,ly=y+h/2;
+        if(on)g.circle(lx,ly,7,0x55000000|(Theme.REQUEST&0xffffff));
+        g.circle(lx,ly,4,on?Theme.REQUEST:Theme.LED_OFF);
+        g.text(label,x+w/2+8,y+h/2+4.5f,Gfx.MONO,12,on?Theme.TEXT:Theme.MUTED,Gfx.CENTER,0);
+        ui.hit(id,x,y,w,h,tap);
     }
     private void screen(int part,int id,int value){rig.set(part,id,value);event(Tutorial.SCREEN_KNOB,id,ui.now);}
 
@@ -304,7 +339,7 @@ public final class Home {
             boolean sel=i==rig.lastPad,flash=s.flashPad[part]==i&&ui.now-s.flashAt[part]<160;
             String id="pad."+part+"."+i;
             boolean held=ui.held(id)||flash;
-            g.rect(px,py,pad,pad,held?0xff3c5a3b:sel?Theme.SELECTED_FILL:Theme.RAISED);
+            g.rect(px,py,pad,pad,held?Theme.HIT:sel?Theme.SELECTED_FILL:Theme.RAISED);
             g.frame(px,py,pad,pad,sel?2:1,sel?Theme.REQUEST:Theme.BORDER);
             g.text(Integer.toString(i+1),px+8,py+18,Gfx.MONO,11,Theme.MUTED,Gfx.LEFT,0);
             g.text(Text.fit(g,rig.catalog.padName(i),pad-10,11),px+pad/2,py+pad-12,Gfx.MONO_MEDIUM,11,sel?Theme.REQUEST:Theme.TEXT,Gfx.CENTER,.04f);
@@ -318,13 +353,7 @@ public final class Home {
                 public void end(){host.audition(part,MpkRouter.PAD_LOW+p,false);}
             });
         }
-        float rx=x+side+12,rw=w-side-12,rh=(h-10)/2;
-        int base=4+rig.lastPad*4;
-        section(part,"PAD "+(rig.lastPad+1)+" · "+rig.catalog.padName(rig.lastPad),new int[]{base,base+1,base+2,base+3},rx,y,rw,rh);
-        ArrayList<Integer> kitIds=new ArrayList<>();
-        for(Catalog.Control c:m.controls)if(c.section.equals("KIT"))kitIds.add(c.id);
-        int[] a=new int[kitIds.size()];for(int i=0;i<a.length;i++)a[i]=kitIds.get(i);
-        section(part,"WHOLE KIT",a,rx,y+rh+10,rw,rh);
+        page(part,m,x+side+12,y,w-side-12,h);
     }
 
     private void selector(String id,float x,float y,float w,String caption,String value,Runnable prev,Runnable next,Runnable open){
@@ -387,7 +416,7 @@ public final class Home {
     // ---- a lesson step on the SOUND screen ----------------------------------------------
     private void coach(float x,float y,float w,float h){
         Gfx g=ui.g;
-        g.rect(x,y,w,h,0xff1d2414);g.frame(x,y,w,h,2,Theme.REQUEST);
+        g.rect(x,y,w,h,Theme.COACH);g.frame(x,y,w,h,2,Theme.REQUEST);
         Tutorial.Step st=tutorial.currentStep();
         g.text("LESSON "+(tutorial.lesson+1)+" · "+tutorial.current().title.toUpperCase(Locale.ROOT),x+18,y+24,Gfx.MONO,10.5f,Theme.MUTED,Gfx.LEFT,.1f);
         g.text(st.title,x+18,y+50,Gfx.DISPLAY,15,Theme.REQUEST,Gfx.LEFT,.02f);

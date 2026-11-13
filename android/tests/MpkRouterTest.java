@@ -8,7 +8,7 @@ import java.util.List;
 public final class MpkRouterTest {
     static void check(boolean ok,String what){if(!ok)throw new AssertionError(what);}
     static final List<String> sent=new ArrayList<>(),controls=new ArrayList<>();
-    static int played,pads,lastBend;
+    static int played,pads,lastBend,program=-1;
     static String m(int s,int a,int b){return String.format("%02X %d %d",s,a,b);}
     static void expect(String what,String... messages){
         check(sent.equals(List.of(messages)),what+": "+sent);sent.clear();
@@ -20,6 +20,7 @@ public final class MpkRouterTest {
             public void transport(MpkRouter.Transport t,boolean p){controls.add(t+" "+p);}
             public void played(boolean pad,int note){played++;if(pad)pads++;}
             public void joystick(int bend){lastBend=bend;}
+            public void program(int n){program=n;}
         });
 
         // Keys play the keys part (Sound design's), whatever channel they send on.
@@ -78,6 +79,8 @@ public final class MpkRouterTest {
         r.keyPart(0);r.message(0xb0,Mpk.CC_JOYSTICK_X,127);
         check(lastBend==8191,"the joystick reports its bend: "+lastBend);
         r.message(0xb0,Mpk.CC_JOYSTICK_X,0);check(lastBend==0,"and its return: "+lastBend);
+        sent.clear();r.message(0xc9,2,0);
+        check(program==2&&sent.isEmpty(),"a program change opens a tab and never reaches the engine");
         System.out.println("PASS: MPK router: keys follow the keys part, pads on their own part with pressure, joystick bend, knobs and transport kept from the engine, nothing left hanging");
     }
 }

@@ -47,7 +47,7 @@ final class Learn {
         if(st.wait!=Tutorial.NEXT){
             boolean done=t.complete();
             float sh=56;
-            g.rect(cx+24,sy,tw,sh,done?0xff1c2f1d:0xff2b2716);g.frame(cx+24,sy,tw,sh,1,done?Theme.PHOSPHOR:Theme.REQUEST);
+            g.rect(cx+24,sy,tw,sh,done?Theme.CONNECTED_FILL:Theme.SELECTED_FILL);g.frame(cx+24,sy,tw,sh,1,done?Theme.PHOSPHOR:Theme.REQUEST);
             if(done){
                 check(g,cx+48,sy+sh/2,10,Theme.PHOSPHOR);
                 g.text("DONE. NICE!",cx+68,sy+sh/2+5,Gfx.MONO_MEDIUM,14,Theme.PHOSPHOR,Gfx.LEFT,.08f);
@@ -92,7 +92,7 @@ final class Learn {
     // ---- pictures -------------------------------------------------------------------------
     void picture(int id,float x,float y,float w,float h){
         Gfx g=home.ui.g;
-        g.rect(x,y,w,h,0xff0e140e);g.frame(x,y,w,h,1,Theme.TRACK);
+        g.rect(x,y,w,h,Theme.SCREEN_DARK);g.frame(x,y,w,h,1,Theme.TRACK);
         float pad=18;x+=pad;y+=pad;w-=2*pad;h-=2*pad;
         switch(id){
             case Tutorial.PIC_MPK:mpk(x,y,w,h,-1);break;
@@ -121,22 +121,22 @@ final class Learn {
     private void mpk(float x,float y,float w,float h,int focus){
         Gfx g=home.ui.g;
         float bw=Math.min(w,h*1.7f),bh=bw/1.7f,bx=x+(w-bw)/2,by=y+(h-bh)/2;
-        g.rect(bx,by,bw,bh,0xff222622);g.frame(bx,by,bw,bh,2,0xff3c443b);
+        g.rect(bx,by,bw,bh,Theme.MPK_BODY);g.frame(bx,by,bw,bh,2,Theme.MPK_EDGE);
         float top=bh*.5f,u=bw/100;
         // pads, 2 rows of 4, in the middle
         float px=bx+24*u,py=by+5*u,ps=(top-9*u)/2,pg=1.6f*u;
         // joystick and transport, left
         float jx=bx+11*u,jy=py+ps*.55f,jr=Math.min(6*u,ps*.5f);
-        g.circle(jx,jy,jr,0xff151815);
+        g.circle(jx,jy,jr,Theme.SLOT);
         float off=Math.max(-1,Math.min(1,home.lastBend/8192f))*jr*.5f;
-        g.circle(jx+off,jy,jr*.5f,0xff606860);
+        g.circle(jx+off,jy,jr*.5f,Theme.KNOB_RIM);
         if(focus==Tutorial.PIC_JOYSTICK)g.ring(jx,jy,jr+4,3,hot());
         g.text("JOYSTICK",jx,jy-jr-6,Gfx.MONO,8.5f,Theme.MUTED,Gfx.CENTER,.06f);
         float ty=py+ps+pg+ps*.35f;
         String[] tl={"REC","PLAY","STOP"};
         for(int i=0;i<3;i++){
             float tx=bx+3.5f*u+i*5.5f*u;
-            g.rect(tx,ty,4.5f*u,3*u,0xff3a3f3a);
+            g.rect(tx,ty,4.5f*u,3*u,Theme.MPK_CONTROL);
             if(focus==Tutorial.PIC_TRANSPORT)g.frame(tx-2,ty-2,4.5f*u+4,3*u+4,2,hot());
             g.text(tl[i],tx+2.25f*u,ty+3*u+11,Gfx.MONO,8,Theme.MUTED,Gfx.CENTER,0);
         }
@@ -144,8 +144,8 @@ final class Learn {
         for(int i=0;i<8;i++){
             int col=i%4,row=1-i/4;
             float qx=px+col*(ps+pg),qy=py+row*(ps+pg);
-            g.rect(qx,qy,ps,ps,i==padLit?0xffa8efb3:0xff3b4a5a);
-            g.frame(qx,qy,ps,ps,1,0xff111411);
+            g.rect(qx,qy,ps,ps,i==padLit?Theme.MPK_LIT:Theme.MPK_PAD);
+            g.frame(qx,qy,ps,ps,1,Theme.SLOT);
         }
         if(focus==Tutorial.PIC_PADS)g.frame(px-5,py-5,4*ps+3*pg+10,2*ps+pg+10,3,hot());
         g.text("PADS",px+(4*ps+3*pg)/2,py+2*ps+pg+14,Gfx.MONO,9,Theme.MUTED,Gfx.CENTER,.06f);
@@ -155,7 +155,7 @@ final class Learn {
         for(int i=0;i<8;i++){
             float ccx=kx+kg*(i%4)+kg/2,ccy=py+(i/4)*(ps+pg)+ps*.4f;
             boolean lit=knobLit&&home.mpk.lastKnob()==i;
-            g.circle(ccx,ccy,kr,lit?0xffa8efb3:0xff121512);g.ring(ccx,ccy,kr,1.5f,0xff5a625a);
+            g.circle(ccx,ccy,kr,lit?Theme.MPK_LIT:Theme.KNOB_BODY);g.ring(ccx,ccy,kr,1.5f,Theme.KNOB_RIM);
             g.text("K"+(i+1),ccx,ccy+kr+11,Gfx.MONO,8.5f,Theme.MUTED,Gfx.CENTER,0);
         }
         if(focus==Tutorial.PIC_KNOBS)g.frame(kx-4,py-5,kg*4+8,2*ps+pg+10,3,hot());
@@ -165,12 +165,12 @@ final class Learn {
         int[] whiteSemis={0,2,4,5,7,9,11};
         for(int i=0;i<22;i++){
             int note=48+(i/7)*12+whiteSemis[i%7];
-            g.rect(kx0+i*kw+1,kyTop,kw-2,kh,note==keyLit?0xffa8efb3:0xffe6e4da);
+            g.rect(kx0+i*kw+1,kyTop,kw-2,kh,note==keyLit?Theme.MPK_LIT:Theme.MPK_KEY);
         }
         for(int i=0;i<21;i++){
             int n=i%7;if(n==2||n==6)continue;
             int note=48+(i/7)*12+whiteSemis[n]+1;
-            g.rect(kx0+(i+1)*kw-kw*.32f,kyTop,kw*.64f,kh*.6f,note==keyLit?0xff5fb36d:0xff1a1c1a);
+            g.rect(kx0+(i+1)*kw-kw*.32f,kyTop,kw*.64f,kh*.6f,note==keyLit?Theme.MPK_LIT:Theme.MPK_BLACK_KEY);
         }
         if(focus==Tutorial.PIC_KEYS)g.frame(kx0-5,kyTop-5,22*kw+10,kh+10,3,hot());
         g.text(home.s.mpkConnected?"CONNECTED: TRY IT":"NOT CONNECTED",bx+bw,by-8,Gfx.MONO,10,home.s.mpkConnected?Theme.PHOSPHOR:Theme.MUTED,Gfx.RIGHT,.08f);
@@ -209,9 +209,9 @@ final class Learn {
             g.text(sec[i],sx+6,py+14,Gfx.MONO_MEDIUM,9,Theme.PHOSPHOR,Gfx.LEFT,.1f);
             for(int k=0;k<n[i];k++){
                 float mx=sx+sw*(k+.5f)/n[i],top=py+30,bot=py+ph-14;
-                g.rect(mx-1.5f,top,3,bot-top,0xff0b100b);
+                g.rect(mx-1.5f,top,3,bot-top,Theme.SLOT);
                 float t=(float)(.5+.4*Math.sin(home.ui.now/900.0+i*1.7+k));
-                g.rect(mx-7,top+(bot-top)*(1-t)-5,14,10,0xffd8d4c2);
+                g.rect(mx-7,top+(bot-top)*(1-t)-5,14,10,Theme.CAP);
                 if(i==2&&k<4){g.frame(mx-9,py+18,18,10,1,Theme.REQUEST);}
             }
             sx+=sw+10;
@@ -327,7 +327,7 @@ final class Learn {
         g.line(x,y+8,x,base,1,Theme.PHOSPHOR);g.text("KEY DOWN",x+4,y+14,Gfx.MONO,9,Theme.PHOSPHOR,Gfx.LEFT,.06f);
         g.line(r0,y+8,r0,base,1,Theme.PHOSPHOR);g.text("KEY UP",r0+4,y+14,Gfx.MONO,9,Theme.PHOSPHOR,Gfx.LEFT,.06f);
         float t=(home.ui.now%3000)/3000f,px=x+w*t;
-        g.line(px,peak-6,px,base,1.5f,0x88eae7d5);
+        g.line(px,peak-6,px,base,1.5f,0x88f1efe8);
     }
 
     /** A slow wave, fading in after the delay. */
@@ -354,7 +354,7 @@ final class Learn {
         boolean picked=t>=.6f;
         float cx=x+w/2,cy=y+h*.42f,r=Math.min(w,h)*.22f;
         for(int i=0;i<=10;i++){float a=(float)Math.toRadians(210+30*i);g.line(cx+(float)Math.sin(a)*(r+6),cy-(float)Math.cos(a)*(r+6),cx+(float)Math.sin(a)*(r+12),cy-(float)Math.cos(a)*(r+12),1,Theme.DIM);}
-        g.circle(cx,cy,r,0xff101610);g.ring(cx,cy,r,2,Theme.KNOB_RIM);
+        g.circle(cx,cy,r,Theme.KNOB_BODY);g.ring(cx,cy,r,2,Theme.KNOB_RIM);
         float sv=picked?pos:value;
         float a=(float)Math.toRadians(210+300*sv);
         g.line(cx+(float)Math.sin(a)*r*.5f,cy-(float)Math.cos(a)*r*.5f,cx+(float)Math.sin(a)*r*.95f,cy-(float)Math.cos(a)*r*.95f,4,Theme.REQUEST);
@@ -372,7 +372,7 @@ final class Learn {
         int lit=recent(home.lastPadAt)?home.lastPadNote-MpkRouter.PAD_LOW:-1;
         for(int i=0;i<16;i++){
             int col=i%4,row=3-i/4;float px=gx+col*(ps+gap),py=gy+row*(ps+gap);
-            g.rect(px,py,ps,ps,i==lit?0xff3c5a3b:Theme.RAISED);g.frame(px,py,ps,ps,1,i<8?Theme.BORDER:Theme.WATER);
+            g.rect(px,py,ps,ps,i==lit?Theme.HIT:Theme.RAISED);g.frame(px,py,ps,ps,1,i<8?Theme.BORDER:Theme.WATER);
             g.text(Integer.toString(i+1),px+6,py+14,Gfx.MONO,9,Theme.MUTED,Gfx.LEFT,0);
             g.text(Text.fit(g,home.rig.catalog.padName(i),ps-8,10),px+ps/2,py+ps-10,Gfx.MONO_MEDIUM,10,Theme.TEXT,Gfx.CENTER,0);
         }

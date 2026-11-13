@@ -14,6 +14,7 @@ package org.fantasmoslam.mpksynth.ui;
  * - The joystick has no direction (centre 0, either extreme 127), so its two axes bend opposite
  *   ways on the keys part: sideways (CC12) bends up, up and down (CC2) bends down, by the part's
  *   bend range (2 semitones unless set by RPN). Bends add; releasing it returns to pitch.
+ * - Program changes (the pads in PROG CHANGE mode) open the screen's tabs; they never reach the engine.
  * - Knobs (CC70-77) and Play, Stop, Record (CC118, 117, 119) never reach the engine: they go to
  *   {@link Controls}, which the app runs on its main thread. So does every key or pad struck, so the
  *   app can start its audio if something (STOP ALL on screen) turned it off.
@@ -31,6 +32,8 @@ public final class MpkRouter {
         default void played(boolean pad,int note){}
         /** The joystick moved (the bend it sends, -8192..8191). */
         default void joystick(int bend){}
+        /** A program change (the pads in PROG CHANGE mode): it opens a tab, never reaches the engine. */
+        default void program(int number){}
     }
     public enum Transport{PLAY,STOP,RECORD}
 
@@ -56,6 +59,7 @@ public final class MpkRouter {
     /** One complete channel message from the MPK (status 0x80-0xEF). */
     public synchronized void message(int status,int d1,int d2){
         int type=status&0xf0,ch=(status&0x0f)+1;
+        if(type==0xc0){controls.program(d1);return;}
         if(ch==Mpk.PAD_CHANNEL){pad(type,d1,d2);return;}
         if(type==0xb0&&ch==1){
             int k=Mpk.knob(status,d1);
