@@ -37,15 +37,39 @@ public final class Catalog {
             String[] f=row.split("\t",-1);name=f[0];String[] n=f[1].split(",");
             for(int k=0;k<8;k++)ids[k]=k<n.length?num(n[k]):-1;
         }
+        Bank(String name,int[] ids){this.name=name;for(int k=0;k<8;k++)this.ids[k]=k<ids.length?ids[k]:-1;}
     }
     public static final class Model{
         public final int id;public final String name,inspired;
         public final Control[] controls;public final Bank[] banks;public final String[] presets;
+        /**
+         * The screen's tabs, each the 8 controls the MPK's knobs turn while it is open: the
+         * model's knob banks, then the controls no bank holds, 8 to a tab.
+         */
+        public final Bank[] tabs;
         Model(int id,String row,String[] params,String[] banks,String[] presets){
             this.id=id;String[] f=row.split("\t",-1);name=f[0];inspired=f.length>1?f[1]:"";
             controls=new Control[params.length];for(int i=0;i<params.length;i++)controls[i]=new Control(i,params[i]);
             this.banks=new Bank[banks.length];for(int i=0;i<banks.length;i++)this.banks[i]=new Bank(banks[i]);
             this.presets=presets;
+            tabs=tabs();
+        }
+        private Bank[] tabs(){
+            boolean[] held=new boolean[controls.length];
+            for(Bank b:banks)for(int id:b.ids){
+                if(id>=PAD_CONTROL){for(int i=4;i<held.length;i++)held[i]=true;}   // the Kit's pad controls follow the last pad
+                else if(id>=0&&id<held.length)held[id]=true;
+            }
+            ArrayList<Integer> rest=new ArrayList<>();
+            for(int i=0;i<held.length;i++)if(!held[i])rest.add(i);
+            ArrayList<Bank> t=new ArrayList<>(java.util.Arrays.asList(banks));
+            for(int i=0;i<rest.size();i+=8){
+                int[] ids=new int[Math.min(8,rest.size()-i)];
+                for(int k=0;k<ids.length;k++)ids[k]=rest.get(i+k);
+                String sec=controls[ids[0]].section;
+                t.add(new Bank(t.isEmpty()||sec.length()>8?"MORE":sec,ids));
+            }
+            return t.toArray(new Bank[0]);
         }
         /** The control with this label in a section, or null. */
         public Control find(String section,String label){

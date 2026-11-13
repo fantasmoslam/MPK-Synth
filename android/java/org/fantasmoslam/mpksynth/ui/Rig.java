@@ -35,8 +35,8 @@ public final class Rig {
     public String presetName(int part){Catalog.Model m=model(part);return preset[part]>=0&&preset[part]<m.presets.length?m.presets[preset[part]]:"";}
     public int preset(int part){return preset[part];}
     public boolean edited(int part){return edited[part];}
-    public int bank(int part){return Math.min(bank[part],model(part).banks.length-1);}
-    public void bank(int part,int b){bank[part]=Math.max(0,Math.min(model(part).banks.length-1,b));}
+    public int bank(int part){return Math.min(bank[part],model(part).tabs.length-1);}
+    public void bank(int part,int b){bank[part]=Math.max(0,Math.min(model(part).tabs.length-1,b));}
 
     /** A control the user changed: from the screen or a knob. */
     public void set(int part,int id,int value){

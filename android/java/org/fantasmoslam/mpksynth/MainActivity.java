@@ -104,6 +104,7 @@ public final class MainActivity extends Activity {
             }
             public void played(boolean pad,int note){MainActivity.this.played();home.played(pad,note,SystemClock.uptimeMillis());}
             public void joystick(int bend){home.joystick(bend,SystemClock.uptimeMillis());}
+            public void program(int number){home.program(number,SystemClock.uptimeMillis());view.ui.invalidate();}
             public void connected(boolean on){
                 home.connected(on,SystemClock.uptimeMillis());
                 notice(on?"MPK mini connected":"MPK mini unplugged");

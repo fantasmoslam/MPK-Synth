@@ -54,7 +54,7 @@ public final class HomeTest {
         ui=new Ui();home=new Home(ui,s,rig,host);
         frame();frame();
         check(g.texts.contains("MPK SYNTH")&&g.texts.contains("ALL NOTES OFF"),"header");
-        check(g.texts.contains("FREQ")&&g.texts.contains("CHORUS"),"the Poly 106 panel");
+        check(g.texts.contains("FREQ")&&g.texts.contains("RES")&&g.texts.contains("DCO"),"the Poly 106 VCF tab and the tab bar");
         // Every model draws on every part.
         for(Catalog.Model m:c.models){rig.setModel(0,m.id);frame();frame();check(g.texts.contains(m.name),"model "+m.name+" shown");}
         rig.setModel(0,c.find("Poly 106"));rig.preset(0,1);
@@ -67,8 +67,11 @@ public final class HomeTest {
 
         // Banks: the second bank moves the knobs to it.
         float[] banks=region("banks");
-        tap(banks[0]+96+8+20,banks[1]+20);check(rig.bank(0)==1,"bank tab");
-        Catalog.Bank bank=rig.model(0).banks[1];
+        tap(banks[0]+banks[2]/rig.model(0).tabs.length+20,banks[1]+20);check(rig.bank(0)==1,"tab");
+        home.program(2,now);check(rig.bank(0)==2,"PROG CHANGE pad 3 opens tab 3");
+        home.program(1,now);check(rig.bank(0)==1,"and pad 2 tab 2");
+        home.program(7,now);check(rig.bank(0)==1&&s.notice.contains("tabs"),"a pad past the last tab says so");
+        Catalog.Bank bank=rig.model(0).tabs[1];
         Mpk.Target k1=home.target(0,0);
         check(k1!=null&&k1.key().endsWith(":"+bank.ids[0]),"knob 1 drives the bank's first control: "+(k1==null?null:k1.key()));
         // An MPK knob picks up and then changes the control on the keys part.
