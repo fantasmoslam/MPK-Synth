@@ -47,7 +47,7 @@ public final class Screens {
         if(runSheet)runLengthSheet(cx,cy,cw,ch);
         if(sheetOptions!=null)sheet(cx,cy,cw,ch);
         bottomBar();
-        if(s.screen!=UiState.Screen.SOUND_DESIGN&&sheetOptions==null)mpk.draw(ui,e,s.designPart,17,723-86-8,W-34);
+        if(s.screen!=UiState.Screen.SOUND_DESIGN&&sheetOptions==null)mpk.draw(ui,e,s.designPart,s.padPart,17,723-86-8,W-34);
         notice();
     }
 
@@ -357,7 +357,15 @@ public final class Screens {
         });
         if(v==null){g.text("The engine has not reported this part's voice yet.",x+1,y+100,Gfx.MONO,13,Theme.MUTED,Gfx.LEFT,0);return;}
         g.text(engine+" / VOICE PARAMETERS",x+1,y+77,Gfx.MONO,12,Theme.PHOSPHOR,Gfx.LEFT,.04f);
-        g.text("EDIT SELECTED PART",x+w,y+76,Gfx.MONO,10.5f,Theme.MUTED,Gfx.RIGHT,.04f);
+        if(mpk.connected()){
+            // The MPK's keys play this part; the pads play their own part, which can be this one.
+            boolean pads=s.padPart==part;
+            String padText=pads?"PADS PLAY THIS PART":String.format(Locale.ROOT,"PADS PLAY PART %02d",s.padPart+1);
+            float bw=Math.max(150,g.textWidth("Pads play this part",Gfx.MONO,13,0)+28);
+            ui.button("design.pads",x+w-bw,y+60,bw,30,pads?padText:"Pads play this part",pads?Ui.SELECTED:Ui.NORMAL,!pads,()->s.padPart=part);
+            g.text("MPK KEYS PLAY THIS PART"+(pads?" · PADS TOO":String.format(Locale.ROOT," · PADS: PART %02d",s.padPart+1)),
+                x+w-bw-14,y+76,Gfx.MONO,10.5f,Theme.MUTED,Gfx.RIGHT,.04f);
+        }else g.text("EDIT SELECTED PART",x+w,y+76,Gfx.MONO,10.5f,Theme.MUTED,Gfx.RIGHT,.04f);
         float top=y+98,gap=focus?13:10,cw=(w-gap*3)/4,ch=(h-98-gap)/2;
         for(int k=0;k<8;k++)paramCard(part,k,v.params[k],x+(k%4)*(cw+gap),top+(k/4)*(ch+gap),cw,ch);
     }
@@ -497,6 +505,31 @@ public final class Screens {
     // ---- RECORDING ---------------------------------------------------------------------
     private static final String[] STATE_TITLES={"READY TO RECORD","RECORDING","SAVING TAKE","TAKE SAVED","TAKE NOT SAVED"};
     private Recorder recorder(){return e.recorder();}
+    /**
+     * The MPK's Play, Stop and Record buttons: the bottom bar's Play music / Stop music,
+     * STOP ALL and Record / Stop recording. One entry point, so a looper can take them over later.
+     */
+    public void mpkTransport(MpkRouter.Transport button,long now){
+        String said;
+        switch(button){
+            case PLAY:{
+                if(!e.musicEngine()||!e.audioOn()){said="MPK PLAY: music is not available";break;}
+                boolean music=e.musicPlaying();
+                e.scape(music?Engine.SCAPE_STOP_MUSIC:Engine.SCAPE_PLAY_MUSIC);
+                said=music?"MPK PLAY: music stopped":"MPK PLAY: music playing";break;
+            }
+            case STOP:run.stopAll();said="MPK STOP: stop all";break;
+            default:{
+                Recorder r=recorder();
+                if(r==null){said="MPK RECORD: recording is not available";break;}
+                int st=r.state();
+                if(st==Recorder.RECORDING){r.stop();said="MPK RECORD: recording stopped";}
+                else if(st==Recorder.SAVING){said="MPK RECORD: still saving the last take";}
+                else{startTake();said=r.state()==Recorder.RECORDING?"MPK RECORD: recording":"MPK RECORD: save the last take first";}
+            }
+        }
+        s.notice=said;s.noticeUntil=now+2500;
+    }
     private void startTake(){
         Recorder r=recorder();if(r==null)return;
         if(r.state()==Recorder.ERROR){go(UiState.Screen.RECORDING);return;}

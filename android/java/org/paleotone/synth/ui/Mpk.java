@@ -96,13 +96,13 @@ public final class Mpk {
      * moves: each knob's number, parameter name and value, with the knob you turned
      * highlighted and a pickup hint where the knob has not taken over yet.
      */
-    public void draw(Ui ui,Engine e,int part,float x,float y,float w){
+    public void draw(Ui ui,Engine e,int part,int padPart,float x,float y,float w){
         if(!showing(ui.now))return;
         Gfx g=ui.g;Engine.Voice v=e.voice(part);
         float h=86,gap=6,cw=(w-16-gap*7)/8,bh=h-26;
         g.rect(x,y,w,h,Theme.PANEL);g.frame(x,y,w,h,1,Theme.REQUEST);
         ui.block(x,y,w,h);
-        String title=String.format(Locale.ROOT,"MPK KNOBS · PART %02d%s",part+1,v==null?"":" · "+v.engineName.toUpperCase(Locale.ROOT));
+        String title=String.format(Locale.ROOT,"MPK KNOBS + KEYS · PART %02d%s · PADS · PART %02d",part+1,v==null?"":" "+v.engineName.toUpperCase(Locale.ROOT),padPart+1);
         g.text(title,x+10,y+14,Gfx.MONO,9.5f,Theme.MUTED,Gfx.LEFT,.06f);
         for(int k=0;k<KNOBS;k++){
             Engine.Param p=v==null?null:v.params[k];

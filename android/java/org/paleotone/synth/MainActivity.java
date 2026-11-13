@@ -78,6 +78,7 @@ public final class MainActivity extends Activity {
         view.screens.run.tick(now,lastTick==0?0:now-lastTick,live);
         lastTick=now;
         if(++tick%3==0)engine.refresh();
+        if(midi!=null)midi.parts(uiState.designPart,uiState.padPart);
         view.tick();
         handler.postDelayed(this,33);
     }};
@@ -105,6 +106,9 @@ public final class MainActivity extends Activity {
         midi=new MidiInput(this,new MidiInput.Mpk(){
             public void knob(int k,int value){
                 view.screens.mpk.move(k,value,engine,uiState.designPart,SystemClock.uptimeMillis());redraw();
+            }
+            public void transport(org.paleotone.synth.ui.MpkRouter.Transport b,boolean pressed){
+                if(pressed){view.screens.mpkTransport(b,SystemClock.uptimeMillis());redraw();}
             }
             public void connected(boolean on){view.screens.mpk.connected(on);redraw();}
         });

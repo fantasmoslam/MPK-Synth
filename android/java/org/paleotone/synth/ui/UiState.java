@@ -26,8 +26,10 @@ public final class UiState {
     public Screen screen=Screen.INSTRUMENT;
     /** Mixer sub-page: 0 parts, 1 habitat layers. */
     public int mixerPage;
-    /** The part sound design edits, 0..3. */
+    /** The part sound design edits, 0..3. The MPK's keys and knobs play and edit it too. */
     public int designPart;
+    /** The part the MPK's pads play, 0..3 (part 4 unless chosen in Sound design). */
+    public int padPart=3;
     /** Quick mix open over the current screen. */
     public boolean quickMix;
     /** Library: the selected sound's id, and the tab (0 sound files, 1 recordings). */
@@ -106,6 +108,7 @@ public final class UiState {
         b.append(';').append(valleySeed).append(';').append(nextSeed).append(';').append(leaderIndex).append(';').append(nextLeader)
          .append(';').append(expedition==null?(expeditionSaved==null?"":expeditionSaved):expedition.save()).append(';');
         if(override!=null)for(int i=0;i<override.length;i++)b.append(i>0?":":"").append(Math.round(override[i]));
+        b.append(';').append(padPart);
         return b.toString();
     }
     public void load(String saved){
@@ -132,6 +135,7 @@ public final class UiState {
                     if(q.length>=2&&q.length%2==0){override=new float[q.length];for(int i=0;i<q.length;i++)override[i]=Float.parseFloat(q[i]);}
                 }
             }
+            if(p.length>31)padPart=Math.max(0,Math.min(3,Integer.parseInt(p[31])));
             screen=Screen.valueOf(p[1]); // last: screens from older versions (the legacy panel) fall back to INSTRUMENT
         }catch(RuntimeException ignored){}
     }
