@@ -102,10 +102,15 @@ public final class MainActivity extends Activity {
         library=new AndroidLibrary(this);recorder=new AndroidRecorder(this);engine=new NativeEngine(this,library,recorder);
         uiState.load(getPreferences(MODE_PRIVATE).getString("ui",null));
         view=new PhosphorView(this,uiState,engine);setContentView(view);
-        midi=new MidiInput(this);
+        midi=new MidiInput(this,new MidiInput.Mpk(){
+            public void knob(int k,int value){
+                view.screens.mpk.move(k,value,engine,uiState.designPart,SystemClock.uptimeMillis());redraw();
+            }
+            public void connected(boolean on){view.screens.mpk.connected(on);redraw();}
+        });
         audio.registerAudioDeviceCallback(devices,handler);
     }
-    @Override protected void onResume(){super.onResume();resumed=true;if(pickerAudio==null||pickerAudio)startAudio();pickerAudio=null;handler.post(refresh);KioskController.restore(this);}
+    @Override protected void onResume(){super.onResume();resumed=true;if(pickerAudio==null||pickerAudio)startAudio();pickerAudio=null;handler.post(refresh);KioskController.restore(this);midi.resume();}
     @Override public void onWindowFocusChanged(boolean focused){
         super.onWindowFocusChanged(focused);
         if(focused&&resumed)KioskController.restore(this);
@@ -118,7 +123,7 @@ public final class MainActivity extends Activity {
     void maintenance(){KioskController.menu(this);}
     @Override protected void onPause(){
         resumed=false;wantAudio=false;recovery.cancel();handler.removeCallbacks(refresh);
-        recorder.stop();midi.close();Native.stop();running=false;
+        recorder.stop();midi.pause();Native.stop();running=false;
         writeSession();
         getPreferences(MODE_PRIVATE).edit().putString("ui",uiState.save()).apply();lastTick=0;
         if(focusHeld)audio.abandonAudioFocus(focus);focusHeld=false;
@@ -127,7 +132,7 @@ public final class MainActivity extends Activity {
     @Override protected void onDestroy(){audio.unregisterAudioDeviceCallback(devices);midi.destroy();library.close();super.onDestroy();}
     @Override public void onBackPressed(){
         if(KioskController.enabled(this)){maintenance();return;}
-        new AlertDialog.Builder(this).setTitle("Leave Paleotone?")
+        new AlertDialog.Builder(this).setTitle("Leave MPK Synth?")
             .setMessage("Save the session and close audio?")
             .setPositiveButton("Save and exit",(d,w)->finish())
             .setNegativeButton("Keep playing",null).show();
@@ -205,7 +210,7 @@ public final class MainActivity extends Activity {
                 }).show();
         }else if(id==4)Native.panic();
         else if(id==5){
-            new AlertDialog.Builder(this).setTitle("Paleotone Android • early alpha")
+            new AlertDialog.Builder(this).setTitle("MPK Synth • built on Paleotone • early alpha")
                 .setMessage("Paleotone is a generative field instrument. Notes to the conductor on INSTRUMENT ask for more danger, majesty, density and so on; the conductor decides how to answer. Mixer sets each part's level, mute, pan and role, the habitat layers and the drone. Sound design edits a part's voice. Library imports WAV files that keyboard and MIDI can play in place of Paleotone's own sounds.\n\nSave session briefly stops audio, writes the current project, then resumes. Leaving the app also saves. Android force-stop, power loss, or a crash can lose unsaved changes.\n\nMIDI lists Android controller output ports; connect via USB OTG. MIDI channel messages are supported; MIDI clock and SysEx are not yet bridged.\n\nUse wired audio for testing. Audio reconnects automatically after an output disconnect. Settings sets Normal (+6 dB), Boost (+12 dB), or Original output, and the audio buffer. A stereo limiter protects digital peaks; begin with low Android media volume. Kiosk mode is optional. Hold the PALEOTONE title for three seconds, or use Kiosk / maintenance here, to enter setup or exit to Android settings.\n\nGPL-3.0-only. Paleotone builds on Felucca and GHOULBOX. Third-party notices, including the interface fonts' SIL Open Font Licences, are included in the APK assets. Full corresponding source accompanies this build.")
                 .setNeutralButton("Kiosk / maintenance",(d,w)->maintenance())
                 .setPositiveButton("Close",null).show();

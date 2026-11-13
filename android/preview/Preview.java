@@ -167,6 +167,7 @@ public final class Preview {
             {"focus-mixer-layers","FOCUS","MIXER"},{"performance-mixer-layers","PERFORMANCE","MIXER"},
             {"focus-sounddesign","FOCUS","SOUND_DESIGN"},{"performance-sounddesign","PERFORMANCE","SOUND_DESIGN"},
             {"focus-sounddesign-voice-sheet","FOCUS","SOUND_DESIGN"},
+            {"focus-mpk-knobs","FOCUS","INSTRUMENT"},{"focus-sounddesign-mpk","FOCUS","SOUND_DESIGN"},
             {"focus-quickmix","FOCUS","INSTRUMENT"},{"performance-quickmix","PERFORMANCE","MIXER"},
             {"focus-library","FOCUS","LIBRARY"},{"performance-library","PERFORMANCE","LIBRARY"},
             {"focus-library-recordings","FOCUS","LIBRARY"},
@@ -213,6 +214,18 @@ public final class Preview {
             if(shot[0].endsWith("runlength"))screens.openRunLength();
             if(shot[0].endsWith("biome-sheet"))screens.choose("Biome",Screens.BIOMES,1,v->{});
             if(shot[0].endsWith("voice-sheet")){Engine.Choice[] c=engine.engines();String[] n=new String[c.length];for(int i=0;i<n.length;i++)n[i]=c[i].name;screens.choose("Voice for part 1",n,0,v->{});}
+            if(shot[0].contains("mpk")){
+                // MPK mini Plus: knobs 1 and 3 have taken over, the rest still need pickup
+                screens.mpk.connected(true);
+                Engine.Voice v=engine.voice(state.designPart);
+                for(int k=0;k<8;k++){
+                    Engine.Param p=v.params[k];if(p==null||!p.used()||p.max<=p.min)continue;
+                    int at=Math.round((p.value-p.min)*127f/(p.max-p.min));
+                    if(k==0||k==2)screens.mpk.move(k,at,engine,state.designPart,now-200);
+                    else screens.mpk.move(k,at>63?at-40:at+40,engine,state.designPart,now-200);
+                }
+                screens.mpk.move(2,Math.round((v.params[2].value-v.params[2].min)*127f/Math.max(1,v.params[2].max-v.params[2].min)),engine,state.designPart,now-100);
+            }
             ui.begin(new Java2dGfx(g,fonts),width/scale,1200/scale,now);screens.draw();ui.end();
             g.dispose();
             ImageIO.write(img,"png",new File(out,shot[0]+(width==2000?"-2000":"")+".png"));

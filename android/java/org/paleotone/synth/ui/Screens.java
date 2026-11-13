@@ -18,6 +18,8 @@ public final class Screens {
     private String sheetTitle;private String[] sheetOptions;private int sheetSelected;private IntConsumer sheetPick;
 
     private final FieldScreens field;
+    /** The MPK mini Plus knobs: they drive the Sound design part's eight parameters. */
+    public final Mpk mpk=new Mpk();
     public Screens(Ui ui,UiState state,Engine engine){this.ui=ui;s=state;e=engine;run=new Run(state,engine);field=new FieldScreens(ui,state,this);}
 
     public void draw(){
@@ -45,6 +47,7 @@ public final class Screens {
         if(runSheet)runLengthSheet(cx,cy,cw,ch);
         if(sheetOptions!=null)sheet(cx,cy,cw,ch);
         bottomBar();
+        if(s.screen!=UiState.Screen.SOUND_DESIGN&&sheetOptions==null)mpk.draw(ui,e,s.designPart,17,723-86-8,W-34);
         notice();
     }
 
@@ -364,6 +367,12 @@ public final class Screens {
             g.text("—",x+w/2,y+h/2+6,Gfx.MONO,16,Theme.DIM,Gfx.CENTER,0);return;
         }
         ui.panel(x,y,w,h);
+        if(mpk.connected()){
+            // which MPK knob drives this parameter, green once it has taken over
+            g.text("K"+(k+1),x+10,y+18,Gfx.MONO,10.5f,mpk.pickedUp(k)?Theme.PHOSPHOR:Theme.DIM,Gfx.LEFT,.04f);
+            String hint=mpk.hint(k,p);
+            if(!hint.isEmpty())g.text(hint,x+w-10,y+18,Gfx.MONO,10.5f,Theme.REQUEST,Gfx.RIGHT,.04f);
+        }
         g.text(p.label,x+w/2,y+33,Gfx.DISPLAY,17,Theme.TEXT,Gfx.CENTER,.02f);
         g.text(longName(p.label),x+w/2,y+51,Gfx.MONO,10.5f,Theme.MUTED,Gfx.CENTER,0);
         String id="design."+part+"."+k;

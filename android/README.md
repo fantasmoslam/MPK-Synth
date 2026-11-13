@@ -144,6 +144,17 @@ Bluetooth is not a suitable route for assessing playable latency.
 - MIDI selects Android MIDI output ports from attached controllers. Channel-message
   parsing handles fragments, running status and interspersed real-time bytes.
   External clock, SysEx and BLE discovery are not implemented. WAV import is available in LIBRARY.
+- **Akai MPK mini Plus** (saved MPC program, unchanged): the app opens it by itself when it is plugged
+  in (or on return to the app); Settings → MIDI still picks any controller. Its keys play the synth on
+  whatever channel they send, and the pads (channel 10, notes 36-51) pass through as before. Knobs 1-8
+  (channel 1, CC70-77) drive the eight edit parameters of the part open in Sound design (the PART tile
+  chooses which); with the MPK they no longer reach the firmware's own CC map (CC71-77 are resonance,
+  envelope, filter and LFO there). Each knob uses pickup: after its parameter changes from anywhere
+  else (a preset, another part or voice, the screen) the knob does nothing until it reaches the
+  parameter's value, so the sound never jumps. Sound design marks each parameter with its knob (K1-K8,
+  green once in control) and TURN UP / TURN DOWN until pickup; on other screens a strip with all eight
+  knobs' names and values shows for 2.5 s after a knob moves. Transport (CC117-119) and the joystick
+  (CC2, CC12) are not assigned yet. Logic: `java/org/paleotone/synth/ui/Mpk.java`, tests: `tests/MpkTest.java`.
 - Audio reconnects automatically after stream errors while foreground and playing,
   with a short debounce and at most five retries. Stop, backgrounding and lost focus
   cancel retries. If recovery is exhausted, START provides an explicit retry.

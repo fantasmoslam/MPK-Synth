@@ -2,7 +2,7 @@ name: Android native alpha
 on:
   workflow_dispatch:
   push:
-    branches: [feature/android-native-sm-t510]
+    branches: [main]
   pull_request:
     paths: ['android/**', '.github/workflows/android-native.yml']
 permissions:
@@ -44,12 +44,12 @@ jobs:
       - name: Build and verify ARM APK (32- and 64-bit)
         run: python3 android/build.py
       - name: Package corresponding source
-        run: git archive --format=zip --output=build/android/Paleotone-Android-source.zip HEAD
+        run: git archive --format=zip --output=build/android/MPK-Synth-source.zip HEAD
       - uses: actions/upload-artifact@v4
         with:
-          name: Paleotone-Android-alpha
+          name: MPK-Synth-alpha
           path: |
-            build/android/Paleotone-Android-0.4.0-alpha.apk
+            build/android/*-alpha.apk
             build/android/SHA256SUMS
-            build/android/Paleotone-Android-source.zip
+            build/android/MPK-Synth-source.zip
           retention-days: 30

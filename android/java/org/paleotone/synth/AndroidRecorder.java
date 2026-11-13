@@ -18,11 +18,13 @@ import org.paleotone.synth.ui.Recorder;
 /**
  * Takes of the final stereo mix as 16-bit WAV. While recording, a writer thread drains
  * the native tap into a private part file; stopping drains the rest, completes the WAV
- * header and copies the file to Music/Paleotone. Only a completed copy is reported
+ * header and copies the file to Music/MPK Synth. Only a completed copy is reported
  * saved. A take that fails to save keeps its part file for Retry, including after the
  * app restarts, and blocks new takes until it is saved or discarded.
  */
 final class AndroidRecorder implements Recorder {
+    /** Takes are saved in Music/ under this folder. */
+    static final String FOLDER="MPK Synth";
     private static final int LEVELS=90;
     private final MainActivity activity;private final SharedPreferences prefs;private final File dir;
     private final Handler main=new Handler(Looper.getMainLooper());
@@ -87,7 +89,7 @@ final class AndroidRecorder implements Recorder {
             return Math.min(root.getUsableSpace(),activity.getFilesDir().getUsableSpace());
         }catch(RuntimeException e){return -1;}
     }
-    public String destination(){return Build.VERSION.SDK_INT>=29?"Music/Paleotone":"Android/data/org.paleotone.synth/files/Music/Paleotone";}
+    public String destination(){return Build.VERSION.SDK_INT>=29?"Music/"+FOLDER:"Android/data/"+activity.getPackageName()+"/files/Music/"+FOLDER;}
 
     public void start(String runName){
         synchronized(this){
@@ -187,7 +189,7 @@ final class AndroidRecorder implements Recorder {
             ContentResolver resolver=activity.getContentResolver();
             ContentValues v=new ContentValues();
             v.put(MediaStore.MediaColumns.DISPLAY_NAME,t.name);v.put(MediaStore.MediaColumns.MIME_TYPE,"audio/wav");
-            v.put(MediaStore.MediaColumns.RELATIVE_PATH,Environment.DIRECTORY_MUSIC+"/Paleotone");v.put(MediaStore.MediaColumns.IS_PENDING,1);
+            v.put(MediaStore.MediaColumns.RELATIVE_PATH,Environment.DIRECTORY_MUSIC+"/"+FOLDER);v.put(MediaStore.MediaColumns.IS_PENDING,1);
             Uri uri=resolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,v);
             if(uri==null)throw new IOException("Android refused the new file");
             try{
@@ -199,7 +201,7 @@ final class AndroidRecorder implements Recorder {
             }catch(IOException|RuntimeException e){resolver.delete(uri,null,null);throw e;}
             return uri.toString();
         }
-        File folder=new File(activity.getExternalFilesDir(Environment.DIRECTORY_MUSIC),"Paleotone");
+        File folder=new File(activity.getExternalFilesDir(Environment.DIRECTORY_MUSIC),FOLDER);
         if(!folder.isDirectory()&&!folder.mkdirs())throw new IOException("cannot create "+folder);
         File target=new File(folder,t.name);
         try(InputStream in=new FileInputStream(t.part);FileOutputStream out=new FileOutputStream(target)){copy(in,out);out.getFD().sync();}

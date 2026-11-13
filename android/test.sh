@@ -49,6 +49,8 @@ cc $FIRMWARE android/tests/scape_test.c -lm -o build/android-tests/scape_test
 build/android-tests/scape_test
 javac -encoding UTF-8 -d build/android-tests android/java/org/paleotone/synth/ui/*.java android/tests/UiTest.java
 java -ea -cp build/android-tests org.paleotone.synth.ui.UiTest
+javac -encoding UTF-8 -cp build/android-tests -d build/android-tests android/tests/MpkTest.java
+java -ea -cp build/android-tests org.paleotone.synth.ui.MpkTest
 # PALEO and the live Scape conductor, through the tablet's bridge.
 c++ -O2 -std=c++17 -w -pthread -Ipaleo android/tests/paleo_bridge_test.cpp android/native/paleo_bridge.cpp \
     paleo/engine/paleo.cpp paleo/engine/conductor.cpp paleo/faust/gen/[!he]*.cpp paleo/faust/gen/horn.cpp \

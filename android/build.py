@@ -16,6 +16,10 @@ import zipfile
 import wave
 
 ROOT = Path(__file__).resolve().parents[1]
+# This app's own identity, so it installs beside Paleotone rather than over it. The Java
+# package stays org.paleotone.synth; aapt2 renames only the installed application id.
+APP_ID = "org.fantasmoslam.mpksynth"
+APP_NAME = "MPK Synth"
 SDK = Path(os.environ.get("ANDROID_HOME", os.environ.get("ANDROID_SDK_ROOT", "")))
 OUT = ROOT / "build/android"
 TOOLS = SDK / "build-tools/35.0.0"
@@ -115,13 +119,13 @@ def main():
     (OUT/"assets/fonts").mkdir(parents=True,exist_ok=True)
     for name in INTERFACE_FONTS:shutil.copy(ROOT/"assets/fonts"/name,OUT/"assets/fonts"/name)
     (OUT/"assets/BUILD.txt").write_text(
-        "Paleotone Android 0.4.0-alpha\nGPL-3.0-only\n"+
+        APP_NAME+" 0.4.0-alpha (built on Paleotone Android)\nGPL-3.0-only\n"+
         subprocess.check_output(["git","rev-parse","HEAD"],cwd=ROOT,text=True).strip()+
         "\nBase: 0390a03f732c5eeec9f62cb2b139df8738396766\n"+
         "Local modifications are included in the corresponding source archive.\n")
     run(TOOLS/"aapt2", "compile", "--dir", ROOT/"android/res", "-o", OUT/"resources.zip")
     run(TOOLS/"aapt2", "link", "-o", OUT/"unsigned.apk", "-I", PLATFORM,
-        "--manifest", ROOT/"android/AndroidManifest.xml", "-A", OUT/"assets", OUT/"resources.zip")
+        "--manifest", ROOT/"android/AndroidManifest.xml", "--rename-manifest-package", APP_ID, "-A", OUT/"assets", OUT/"resources.zip")
     with zipfile.ZipFile(OUT/"unsigned.apk","a",zipfile.ZIP_DEFLATED) as archive:
         archive.write(OUT/"dex/classes.dex","classes.dex")
         for abi,_ in ABIS:
@@ -133,7 +137,7 @@ def main():
         run("keytool","-genkeypair","-keystore",key,"-storepass","android","-keypass","android",
             "-alias","androiddebugkey","-keyalg","RSA","-keysize","2048","-validity","10000",
             "-dname","CN=Paleotone Development,O=Paleotone,C=US")
-    apk=OUT/"Paleotone-Android-0.4.0-alpha.apk"
+    apk=OUT/(APP_NAME.replace(" ","-")+"-0.4.0-alpha.apk")
     run(TOOLS/"apksigner","sign","--ks",key,"--ks-pass","pass:android","--key-pass","pass:android",
         "--out",apk,OUT/"aligned.apk")
     run(TOOLS/"apksigner","verify","--verbose",apk)
